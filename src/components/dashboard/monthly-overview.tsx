@@ -25,8 +25,8 @@ export default function MonthlyOverview({ data }: MonthlyOverviewProps) {
   }));
 
   const chartConfig = {
-    income: { label: "Income", color: "var(--chart-2)" },
-    expenses: { label: "Expenses", color: "var(--chart-5)" },
+    income: { label: "Income", color: "#10b981" },
+    expenses: { label: "Expenses", color: "#f43f5e" },
   } satisfies ChartConfig;
 
   return (
@@ -52,25 +52,31 @@ export default function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </linearGradient>
             </defs>
 
-            <CartesianGrid vertical={false} />
+            <CartesianGrid vertical={false} stroke="#3f3f46" strokeDasharray="3 3" />
             <XAxis
               dataKey="month"
               axisLine={false}
               tickLine={false}
+              tick={{ fill: "#a1a1aa", fontSize: 12 }}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
+              tick={{ fill: "#a1a1aa", fontSize: 12 }}
               tickFormatter={(value: number) => value.toLocaleString("en-US")}
               width={64}
             />
             <Tooltip content={<ChartTooltipContent formatter={(value) => formatMoney(Number(value))} />} />
-            <ChartLegend content={<ChartLegendContent />} />
+            <ChartLegend
+              verticalAlign="top"
+              height={36}
+              content={<ChartLegendContent verticalAlign="top" />}
+            />
             <Area
               type="monotone"
               dataKey="income"
               name="Income"
-              stroke="var(--color-income)"
+              stroke="#10b981"
               strokeWidth={2}
               fill="url(#incomeGradient)"
               fillOpacity={1}
@@ -79,7 +85,7 @@ export default function MonthlyOverview({ data }: MonthlyOverviewProps) {
               type="monotone"
               dataKey="expenses"
               name="Expenses"
-              stroke="var(--color-expenses)"
+              stroke="#f43f5e"
               strokeWidth={2}
               fill="url(#expenseGradient)"
               fillOpacity={1}
