@@ -19,7 +19,7 @@ export const auth = betterAuth({
       verification: schema.verification,
     },
   }),
-  emailAndPassword: { enabled: true },
+  emailAndPassword: { enabled: true, autoSignIn: false },
   onAPIError: {
     onError(error) {
       if (process.env.NODE_ENV !== "production") {

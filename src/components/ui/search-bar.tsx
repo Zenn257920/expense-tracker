@@ -1,8 +1,8 @@
 "use client";
 
 import { RotateCcw, Search } from "lucide-react";
-import Input from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 
 interface SearchBarProps {
   value: string;
@@ -29,29 +29,25 @@ export default function SearchBar({
       }}
       className="flex flex-col gap-2 sm:flex-row"
     >
-      <div className="relative min-w-0 flex-1">
-        <Search
-          size={18}
-          aria-hidden="true"
-          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500"
-        />
-        <Input
+      <InputGroup className="h-10 min-w-0 flex-1">
+        <InputGroupAddon>
+          <Search aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupInput
           type="search"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="pl-11 pr-4"
         />
-      </div>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton type="submit" aria-label="Search">
+            <Search data-icon="inline-start" />
+            <span>Search</span>
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
 
       <div className="flex gap-2">
-        <Button
-          type="submit"
-          className="h-11 flex-1 rounded-xl bg-zinc-800 px-5 text-white hover:bg-zinc-700 sm:flex-none"
-        >
-          <Search size={16} />
-          Search
-        </Button>
         <Button
           type="button"
           aria-label="Reset search"
@@ -59,10 +55,9 @@ export default function SearchBar({
           disabled={!value && !hasSearch}
           onClick={onReset}
           variant="outline"
-          size="icon-lg"
-          className="h-11 w-11 rounded-xl border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+          size="icon"
         >
-          <RotateCcw size={17} />
+          <RotateCcw data-icon="inline-start" />
         </Button>
       </div>
     </form>

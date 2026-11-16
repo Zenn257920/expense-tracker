@@ -4,9 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import DashboardSkeleton from "@/components/dashboard/dashboard-skeleton";
 import SummaryCard from "@/components/dashboard/summary-card";
 import MonthlyOverview from "@/components/dashboard/monthly-overview";
-import type { DashboardSummary, DashboardApiResponse } from "@/types/dashboard";
+import type { DashboardSummary } from "@/types/dashboard";
 import { formatAmount } from "@/lib/format";
-import { fetchGet } from "@/lib/client-fetch";
+import { api } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -25,26 +29,16 @@ export default function DashboardPage() {
 
     async function loadDashboard() {
       try {
-        const response = await fetchGet("/api/dashboard/summary");
-
-        if (!response.ok) {
-          throw new Error("Failed to load dashboard data.");
-        }
-
-        const result: DashboardApiResponse = await response.json();
-
-        if (!result.success) {
-          throw new Error("Could not retrieve dashboard summary.");
-        }
+        const result = await api.getDashboardSummary();
 
         if (isActive) {
           setError(null);
-          setSummary(result.data);
+          setSummary(result);
         }
       } catch (err) {
         if (isActive) {
           setError(
-            err instanceof Error ? err.message : "Something went wrong.",
+            getApiErrorMessage(err, "Could not load dashboard data."),
           );
         }
       } finally {
@@ -65,45 +59,31 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-950 p-6">
-        <p className="text-red-400">{error}</p>
-
-        <button
-          onClick={() => {
-            refreshDashboard();
-          }}
-          className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
-        >
-          Try again
-        </button>
+      <div className="p-4 sm:p-6">
+        <Card className="mx-auto max-w-2xl">
+          <CardHeader>
+            <CardTitle>Could not load your dashboard</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent><Button onClick={refreshDashboard}>Try again</Button></CardContent>
+        </Card>
       </div>
     );
   }
 
   if (!summary) {
-    return (
-      <p className="min-h-screen bg-zinc-950 p-6 text-zinc-400">
-        No dashboard data.
-      </p>
-    );
+    return <Empty className="m-6 border"><EmptyHeader><EmptyTitle>No dashboard data</EmptyTitle><EmptyDescription>Try refreshing the page.</EmptyDescription></EmptyHeader></Empty>;
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-7 text-white sm:px-6 sm:py-10">
-      <div className="mx-auto max-w-7xl space-y-8 sm:space-y-10">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Dashboard
-          </h1>
-        </header>
-
+    <div className="px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:gap-8">
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard
             title="Total Balance"
             amount={formatAmount(summary.balance) + " MMK"}
             description="Your current balance"
             icon="balance"
-            color="text-blue-300"
           />
 
           <SummaryCard
@@ -111,7 +91,6 @@ export default function DashboardPage() {
             amount={formatAmount(summary.totalIncome) + " MMK"}
             description="Income recorded so far"
             icon="income"
-            color="text-emerald-300"
           />
 
           <SummaryCard
@@ -119,14 +98,11 @@ export default function DashboardPage() {
             amount={formatAmount(summary.totalExpenses) + " MMK"}
             description="Expenses recorded so far"
             icon="expenses"
-            color="text-rose-300"
           />
         </section>
 
-        <section>
-          <MonthlyOverview data={summary.monthlyTrend} />
-        </section>
+        <MonthlyOverview data={summary.monthlyTrend} />
       </div>
-    </main>
+    </div>
   );
 }

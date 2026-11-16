@@ -2,24 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { api } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-client";
 import type { Category } from "@/types/dashboard";
-import { fetchGet } from "@/lib/client-fetch";
-
-interface CategoriesResponse {
-  success: boolean;
-  data: Category[];
-}
-
-async function getCategories() {
-  const response = await fetchGet("/api/categories");
-
-  if (!response.ok) {
-    throw new Error("Could not load categories.");
-  }
-
-  const result: CategoriesResponse = await response.json();
-  return result.data;
-}
 
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -28,11 +13,11 @@ export function useCategories() {
 
   const refreshCategories = useCallback(async () => {
     try {
-      setCategories(await getCategories());
+      setCategories(await api.getCategories());
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not load categories.",
+        getApiErrorMessage(err, "Could not load categories."),
       );
     } finally {
       setIsLoading(false);
@@ -42,14 +27,14 @@ export function useCategories() {
   useEffect(() => {
     let isActive = true;
 
-    getCategories()
+    api.getCategories()
       .then((result) => {
         if (isActive) setCategories(result);
       })
       .catch((err: unknown) => {
         if (isActive) {
           setError(
-            err instanceof Error ? err.message : "Could not load categories.",
+            getApiErrorMessage(err, "Could not load categories."),
           );
         }
       })

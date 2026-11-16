@@ -1,18 +1,16 @@
 import { Suspense } from "react";
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthSession } from "@/lib/auth-session";
 
 export default function SettingsPage() {
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-7 text-white sm:px-6 sm:py-10">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-3xl">
-        <h1 className="text-2xl font-bold sm:text-3xl">Settings</h1>
-        <p className="mt-2 text-sm text-zinc-400">Your account information.</p>
-        <Suspense fallback={<SettingsLoading />}>
-          <SettingsDetails />
-        </Suspense>
+        <Suspense fallback={<SettingsLoading />}><SettingsDetails /></Suspense>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -20,13 +18,16 @@ async function SettingsDetails() {
   const session = await getAuthSession();
 
   return (
-    <section className="mt-8 space-y-4 rounded-2xl border border-white/10 bg-zinc-900 p-5 sm:p-6">
-      <div><p className="text-xs text-zinc-500">Name</p><p className="mt-1">{session?.user.name}</p></div>
-      <div><p className="text-xs text-zinc-500">Email</p><p className="mt-1">{session?.user.email}</p></div>
-    </section>
+    <Card className="mt-6">
+      <CardHeader><CardTitle>Account</CardTitle><CardDescription>Your profile details.</CardDescription></CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        <div><p className="text-sm text-muted-foreground">Name</p><p className="mt-1 font-medium">{session?.user.name}</p></div>
+        <div><p className="text-sm text-muted-foreground">Email</p><p className="mt-1 font-medium">{session?.user.email}</p></div>
+      </CardContent>
+    </Card>
   );
 }
 
 function SettingsLoading() {
-  return <div className="mt-8 h-32 animate-pulse rounded-2xl border border-white/10 bg-zinc-900" />;
+  return <Card className="mt-6"><CardContent className="flex flex-col gap-4 pt-5"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-1/2" /></CardContent></Card>;
 }

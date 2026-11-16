@@ -1,27 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import AddTransactionForm from "@/components/transactions/add-transaction-form";
 import RecentTransactions from "@/components/transactions/recent-transactions";
 import SearchBar from "@/components/ui/search-bar";
 import type { RecentTransaction } from "@/types/dashboard";
 import { useCategories } from "@/hooks/use-categories";
-import { fetchGet } from "@/lib/client-fetch";
+import { api } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-client";
 import TransactionsSkeleton from "@/components/transactions/transactions-skeleton";
+import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 
 const LIMIT = 10;
-
-interface TransactionsApiResponse {
-  success: boolean;
-  data: RecentTransaction[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
@@ -34,36 +26,14 @@ export default function TransactionsPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
-  const {
-    categories,
-    isLoading: isLoadingCategories,
-    error: categoriesError,
-  } = useCategories();
+  const { categories } = useCategories();
 
   useEffect(() => {
     let isActive = true;
 
     async function loadTransactions() {
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          limit: String(LIMIT),
-          search,
-        });
-
-        const response = await fetchGet(
-          `/api/transactions?${params.toString()}`,
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to load transactions.");
-        }
-
-        const result: TransactionsApiResponse = await response.json();
-
-        if (!result.success) {
-          throw new Error("Could not retrieve transactions.");
-        }
+        const result = await api.getTransactions({ page, limit: LIMIT, search });
 
         if (isActive) {
           setError(null);
@@ -73,9 +43,7 @@ export default function TransactionsPage() {
         }
       } catch (err) {
         if (isActive) {
-          setError(
-            err instanceof Error ? err.message : "Something went wrong.",
-          );
+          setError(getApiErrorMessage(err, "Could not load transactions."));
         }
       } finally {
         if (isActive) setIsLoading(false);
@@ -100,39 +68,14 @@ export default function TransactionsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-7 text-white sm:px-6 sm:py-10">
-      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Transactions
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400 sm:text-base">
-            Records of my transactions.
-          </p>
-        </header>
-
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-white/10 bg-zinc-900 px-4 py-3.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800">
-            <span className="flex items-center gap-2">
-              <Plus size={18} className="text-blue-400" />
-              Add a transaction
-            </span>
-            <span className="text-xs text-zinc-500 group-open:hidden">
-              Show form
-            </span>
-            <span className="hidden text-xs text-zinc-500 group-open:inline">
-              Hide form
-            </span>
-          </summary>
-          <div className="mt-4">
-            <AddTransactionForm
-              categories={categories}
-              isLoadingCategories={isLoadingCategories}
-              categoriesError={categoriesError}
-              onTransactionAdded={refreshTransactions}
-            />
-          </div>
-        </details>
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">Browse, search, and manage your transactions.</p>
+          <Button variant="zinc" nativeButton={false} render={<Link href="/transactions/new" />}>
+            <Plus data-icon="inline-start" />Add transaction
+          </Button>
+        </div>
 
         <SearchBar
           value={searchInput}
@@ -159,22 +102,16 @@ export default function TransactionsPage() {
         />
 
         {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-            <p className="text-red-400">{error}</p>
-
-            <button
-              onClick={() => void refreshTransactions()}
-              className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-500"
-            >
-              Try again
-            </button>
+          <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <FieldError>{error}</FieldError>
+            <Button variant="outline" onClick={() => void refreshTransactions()}>Try again</Button>
           </div>
         )}
 
         {!error && (
           <section className="space-y-4">
             {isLoading ? (
-              <div className="py-10 text-center text-zinc-400">
+              <div className="py-10 text-center text-muted-foreground">
                 Loading transactions...
               </div>
             ) : (
@@ -189,38 +126,40 @@ export default function TransactionsPage() {
 
         {!isLoading && !error && totalTransactions > 0 && (
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               Page {page} of {totalPages}
             </p>
 
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 disabled={page === 1}
                 onClick={() => {
                   setIsLoading(true);
                   setPage((prev) => prev - 1);
                 }}
                 aria-label="Previous page"
-                className="rounded-lg border border-zinc-700 p-2 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ChevronLeft size={20} />
-              </button>
+                <ChevronLeft data-icon="inline-start" />
+              </Button>
 
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 disabled={page >= totalPages}
                 onClick={() => {
                   setIsLoading(true);
                   setPage((prev) => prev + 1);
                 }}
                 aria-label="Next page"
-                className="rounded-lg border border-zinc-700 p-2 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ChevronRight size={20} />
-              </button>
+                <ChevronRight data-icon="inline-start" />
+              </Button>
             </div>
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

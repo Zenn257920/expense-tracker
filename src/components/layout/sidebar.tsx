@@ -4,16 +4,41 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  Wallet,
-  LayoutDashboard,
   ArrowLeftRight,
-  Tags,
-  Menu,
-  X,
-  Settings,
+  LayoutDashboard,
   LogOut,
+  Settings,
+  Tags,
+  Wallet,
 } from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -22,99 +47,145 @@ const menuItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export default function Sidebar() {
+export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
+  const { isMobile, setOpenMobile } = useSidebar();
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleLogout() {
-    await authClient.signOut();
-    router.replace("/login");
-    router.refresh();
+    setIsSigningOut(true);
+    try {
+      const result = await authClient.signOut();
+      if (result.error) {
+        toast.error(
+          result.error.message ?? "Could not sign out. Please try again.",
+        );
+        return;
+      }
+
+      setIsLogoutOpen(false);
+      toast.success("Signed out successfully.");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast.error("Could not sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
-  const isCurrentPath = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <Sidebar collapsible="icon" variant="inset">
+      <SidebarHeader className="h-20 justify-center px-5">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-700 text-white">
+            <Wallet aria-hidden="true" />
+          </span>
+          <span className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <span className="block truncate text-sm font-semibold">
+              MyFinance
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              Personal finance
+            </span>
+          </span>
+        </Link>
+      </SidebarHeader>
+
+      <SidebarSeparator />
+
+      <SidebarContent>
+        <SidebarGroup className="px-3 py-4">
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => {
+                const active =
+                  pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
+                const Icon = item.icon;
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      render={<Link href={item.href} />}
+                      isActive={active}
+                      size="lg"
+                      tooltip={item.label}
+                      onClick={() => {
+                        if (isMobile) setOpenMobile(false);
+                      }}
+                    >
+                      <Icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border p-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setIsLogoutOpen(true)}
+              tooltip="Sign out"
+              size="lg"
+              className="text-muted-foreground"
+            >
+              <LogOut />
+              <span>Sign out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+
+      <AlertDialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign out of MyFinance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You can sign back in at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSigningOut}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={handleLogout}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Sidebar>
+  );
+}
+
+export function DashboardHeader() {
+  const pathname = usePathname();
+  const title =
+    pathname === "/transactions/new"
+      ? "Add transaction"
+      : (menuItems.find(
+          (item) =>
+            pathname === item.href || pathname.startsWith(`${item.href}/`),
+        )?.label ?? "Workspace");
 
   return (
-    <>
-      {isOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation menu"
-          onClick={() => setIsOpen(false)}
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
-        />
-      )}
-
-      <aside className="relative z-40 w-full shrink-0 border-b border-white/10 bg-zinc-950 md:sticky md:top-0 md:flex md:h-screen md:w-64 md:flex-col md:border-b-0 md:border-r md:border-white/10 md:px-5 md:py-6">
-        <div className="flex h-16 items-center justify-between px-4 md:mb-10 md:h-auto md:justify-start md:px-0">
-          <div className="flex items-center gap-3">
-            <Wallet size={22} className="text-zinc-400" />
-            <div>
-              <p className="text-base font-bold tracking-tight text-white">
-                MyFinance
-              </p>
-              <p className="hidden text-xs text-zinc-500 md:block">
-                Personal finance
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label={
-              isOpen ? "Close navigation menu" : "Open navigation menu"
-            }
-            aria-expanded={isOpen}
-            onClick={() => setIsOpen((open) => !open)}
-            className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-zinc-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 md:hidden"
-          >
-            {isOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-
-        <div
-          className={`${isOpen ? "flex" : "hidden"} absolute left-0 right-0 top-full flex-col border-b border-white/10 bg-zinc-950 px-4 pb-4 pt-2 shadow-2xl shadow-black/40 md:static md:flex md:flex-1 md:border-0 md:bg-transparent md:p-0 md:shadow-none`}
-        >
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
-            Menu
-          </p>
-
-          <nav className="space-y-1.5">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const active = isCurrentPath(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  aria-current={active ? "page" : undefined}
-                  className={`group flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-zinc-800 text-white"
-                      : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-                  }`}
-                >
-                  <Icon
-                    size={18}
-                    className={
-                      active
-                        ? "text-blue-300"
-                        : "text-zinc-500 group-hover:text-zinc-300"
-                    }
-                  />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-          <button type="button" onClick={handleLogout} className="mt-auto flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white">
-            <LogOut size={18} /> Sign out
-          </button>
-        </div>
-      </aside>
-    </>
+    <header className="flex h-14 items-center gap-3 border-b px-4 sm:px-6">
+      <SidebarTrigger />
+      <div className="h-5 w-px bg-border" />
+      <h1 className="text-sm font-medium text-foreground">{title}</h1>
+    </header>
   );
 }

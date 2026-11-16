@@ -1,179 +1,203 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ArrowDownLeft, ArrowUpRight, Plus } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
-import type { Category } from "@/types/dashboard";
-import Input from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useCategories } from "@/hooks/use-categories";
+import { api } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-client";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import Input from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Category } from "@/types/dashboard";
+import { Spinner } from "@/components/ui/spinner";
 
 type CategoryType = Category["type"];
+const typeItems = [
+  { label: "Expense", value: "expense" },
+  { label: "Income", value: "income" },
+];
 
 export default function CategoriesPage() {
-  const {
-    categories,
-    isLoading,
-    error: categoriesError,
-    refreshCategories,
-  } = useCategories();
+  const { categories, isLoading, error: categoriesError, refreshCategories } = useCategories();
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState<CategoryType>("expense");
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError("");
     setIsSaving(true);
-    setSaveError(null);
-
     try {
-      const response = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type }),
-      });
-      const result: { message?: string } = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message ?? "Could not create category.");
-      }
-
+      await api.createCategory({ name, type });
       setName("");
       await refreshCategories();
+      toast.success("Category added successfully.");
     } catch (err) {
-      setSaveError(
-        err instanceof Error ? err.message : "Something went wrong.",
-      );
+      setError(getApiErrorMessage(err, "Could not create category."));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function startEditing(category: Category) {
+    setEditing(category);
+    setEditName(category.name);
+    setEditType(category.type);
+    setError("");
+  }
+
+  async function handleUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    setError("");
+    setIsSaving(true);
+    try {
+      await api.updateCategory(editing.id, { name: editName, type: editType });
+      setEditing(null);
+      await refreshCategories();
+      toast.success("Category updated successfully.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not update category."));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setError("");
+    setIsSaving(true);
+    try {
+      await api.deleteCategory(deleteTarget.id);
+      setDeleteTarget(null);
+      await refreshCategories();
+      toast.success("Category deleted successfully.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not delete category."));
+      setDeleteTarget(null);
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-7 text-white sm:px-6 sm:py-10">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Categories
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400 sm:text-base">
-            Organize income and expenses with categories.
-          </p>
-        </header>
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Add a category</CardTitle>
+            <CardDescription>Keep income and expenses organized.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+              <FieldGroup className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="category-name">Name</FieldLabel>
+                  <Input id="category-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Groceries" maxLength={100} required />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="category-type">Type</FieldLabel>
+                  <Select items={typeItems} value={type} onValueChange={(value) => value && setType(value as CategoryType)}>
+                    <SelectTrigger id="category-type" className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectGroup>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+              </FieldGroup>
+              <Button type="submit" variant="zinc" size="lg" disabled={isSaving} className="w-full sm:w-auto">
+                {isSaving ? <><Spinner data-icon="inline-start" />Adding...</> : <><Plus data-icon="inline-start" />Add category</>}
+              </Button>
+            </form>
+            {error && <FieldError className="mt-4">{error}</FieldError>}
+          </CardContent>
+        </Card>
 
-        <section className="rounded-2xl border border-white/10 bg-zinc-900/80 p-5 sm:p-6">
-          <h2 className="text-lg font-semibold">Add a category</h2>
-          <form
-            onSubmit={handleSubmit}
-            className="mt-5 grid gap-4 sm:grid-cols-2 sm:items-end"
-          >
-            <div>
-              <label
-                htmlFor="category-name"
-                className="mb-2 block text-sm text-zinc-300"
-              >
-                Name
-              </label>
-              <Input
-                id="category-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="e.g. Groceries"
-                maxLength={100}
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="category-type"
-                className="mb-2 block text-sm text-zinc-300"
-              >
-                Type
-              </label>
-              <select
-                id="category-type"
-                value={type}
-                onChange={(event) =>
-                  setType(event.target.value as CategoryType)
-                }
-                className="h-11 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 text-sm text-white outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20"
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={isSaving}
-              className="h-11 rounded-xl bg-zinc-800 px-4 text-white hover:bg-zinc-700 sm:col-span-2 sm:justify-self-end"
-            >
-              <Plus size={16} />
-              {isSaving ? "Adding..." : "Add category"}
-            </Button>
-          </form>
-          {saveError && (
-            <p role="alert" className="mt-4 text-sm text-red-400">
-              {saveError}
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-zinc-900/80 p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold">Your categories</h2>
-            {!isLoading && (
-              <span className="text-sm text-zinc-500">
-                {categories.length} Total
-              </span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Your categories</CardTitle>
+            <CardDescription>{isLoading ? "Loading categories..." : `${categories.length} categories`}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {categoriesError ? (
+              <FieldError>{categoriesError}</FieldError>
+            ) : isLoading ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Loading categories...</p>
+            ) : categories.length === 0 ? (
+              <Empty className="border"><EmptyHeader><EmptyTitle>No categories yet</EmptyTitle><EmptyDescription>Add a category above to get started.</EmptyDescription></EmptyHeader></Empty>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {categories.map((category) => {
+                  const Icon = category.type === "income" ? ArrowUpRight : ArrowDownLeft;
+                  const isIncome = category.type === "income";
+                  return (
+                    <li key={category.id}>
+                      <Card size="sm">
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+                          {editing?.id === category.id ? (
+                            <form onSubmit={handleUpdate} className="grid w-full gap-3 sm:grid-cols-[1fr_12rem_auto_auto]">
+                              <Field><FieldLabel htmlFor="edit-category-name">Name</FieldLabel><Input id="edit-category-name" value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={100} required /></Field>
+                              <Field><FieldLabel htmlFor="edit-category-type">Type</FieldLabel><Select items={typeItems} value={editType} onValueChange={(value) => value && setEditType(value as CategoryType)}><SelectTrigger id="edit-category-type" className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
+                              <Button type="submit" size="lg" disabled={isSaving} className="self-end">Save</Button>
+                              <Button type="button" variant="outline" size="lg" onClick={() => setEditing(null)} className="self-end">Cancel</Button>
+                            </form>
+                          ) : (
+                            <>
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className="flex size-9 items-center justify-center rounded-lg bg-muted"><Icon /></span>
+                                <span className="truncate font-medium">{category.name}</span>
+                                <Badge variant={isIncome ? "secondary" : "outline"}>{isIncome ? "Income" : "Expense"}</Badge>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button type="button" variant="outline" size="sm" onClick={() => startEditing(category)}><Pencil data-icon="inline-start" />Edit</Button>
+                                <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteTarget(category)}><Trash2 data-icon="inline-start" />Delete</Button>
+                              </div>
+                            </>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </div>
-
-          {isLoading ? (
-            <p className="py-10 text-center text-sm text-zinc-400">
-              Loading categories...
-            </p>
-          ) : categoriesError ? (
-            <p role="alert" className="py-10 text-center text-sm text-red-400">
-              {categoriesError}
-            </p>
-          ) : categories.length === 0 ? (
-            <p className="py-10 text-center text-sm text-zinc-400">
-              No categories yet. Add one above to get started.
-            </p>
-          ) : (
-            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-              {categories.map((category) => {
-                const isIncome = category.type === "income";
-                const Icon = isIncome ? ArrowUpRight : ArrowDownLeft;
-
-                return (
-                  <li
-                    key={category.id}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/60 p-4"
-                  >
-                    <span className="font-medium text-zinc-100">
-                      {category.name}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                        isIncome
-                          ? "bg-emerald-500/10 text-emerald-300"
-                          : "bg-rose-500/10 text-rose-300"
-                      }`}
-                    >
-                      <Icon size={14} />
-                      {isIncome ? "Income" : "Expense"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+          </CardContent>
+        </Card>
       </div>
-    </main>
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? `“${deleteTarget.name}” will be removed. Categories with transactions cannot be deleted.` : "This category will be removed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isSaving} variant="destructive">{isSaving ? "Deleting..." : "Delete category"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
