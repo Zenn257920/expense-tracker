@@ -2,11 +2,13 @@ import { and, count, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
-import { DEMO_USER_ID } from "@/lib/demo-user";
+import { getAuthSession } from "@/lib/auth-session";
 import { isValidAmount, isValidDate } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuthSession();
+    if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
     const body = await request.json();
 
     const { categoryId, description, amount, transactionDate } = body;
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
       .where(
         and(
           eq(categories.id, categoryId),
-          eq(categories.userId, DEMO_USER_ID),
+          eq(categories.userId, session.user.id),
         ),
       )
       .limit(1);
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
     const [newTransaction] = await db
       .insert(transactions)
       .values({
-        userId: DEMO_USER_ID,
+        userId: session.user.id,
         categoryId,
         description: description.trim(),
         amount: amount.toFixed(2),
@@ -102,6 +104,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const session = await getAuthSession();
+    if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
     const searchParams = new URL(request.url).searchParams;
 
     const categoryId = searchParams.get("categoryId");
@@ -127,7 +131,7 @@ export async function GET(request: Request) {
       return Response.json({ message: "Invalid date range" }, { status: 400 });
     }
 
-    const filters = [eq(transactions.userId, DEMO_USER_ID)];
+    const filters = [eq(transactions.userId, session.user.id)];
 
     if (categoryId) {
       filters.push(eq(transactions.categoryId, categoryId));

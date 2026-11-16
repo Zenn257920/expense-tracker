@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
-import { DEMO_USER_ID } from "@/lib/demo-user";
+import { getAuthSession } from "@/lib/auth-session";
 import { isValidAmount, isValidDate } from "@/lib/validation";
 
 interface RouteContext {
@@ -12,6 +12,8 @@ interface RouteContext {
 // PATCH: Update a transaction
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
+    const session = await getAuthSession();
+    if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
     const { id } = await params;
     const body = await request.json();
 
@@ -22,7 +24,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       .select()
       .from(transactions)
       .where(
-        and(eq(transactions.id, id), eq(transactions.userId, DEMO_USER_ID)),
+        and(eq(transactions.id, id), eq(transactions.userId, session.user.id)),
       )
       .limit(1);
 
@@ -58,7 +60,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         .where(
           and(
             eq(categories.id, categoryId),
-            eq(categories.userId, DEMO_USER_ID),
+            eq(categories.userId, session.user.id),
           ),
         )
         .limit(1);
@@ -130,7 +132,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       .update(transactions)
       .set(updates)
       .where(
-        and(eq(transactions.id, id), eq(transactions.userId, DEMO_USER_ID)),
+        and(eq(transactions.id, id), eq(transactions.userId, session.user.id)),
       )
       .returning();
 
@@ -152,12 +154,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 // DELETE: Remove a transaction
 export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
+    const session = await getAuthSession();
+    if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
     const [deletedTransaction] = await db
       .delete(transactions)
       .where(
-        and(eq(transactions.id, id), eq(transactions.userId, DEMO_USER_ID)),
+        and(eq(transactions.id, id), eq(transactions.userId, session.user.id)),
       )
       .returning();
 

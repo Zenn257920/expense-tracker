@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { Category } from "@/types/dashboard";
+import { fetchGet } from "@/lib/client-fetch";
 
 interface CategoriesResponse {
   success: boolean;
@@ -10,7 +11,7 @@ interface CategoriesResponse {
 }
 
 async function getCategories() {
-  const response = await fetch("/api/categories");
+  const response = await fetchGet("/api/categories");
 
   if (!response.ok) {
     throw new Error("Could not load categories.");

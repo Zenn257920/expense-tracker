@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Wallet,
@@ -10,17 +10,28 @@ import {
   Tags,
   Menu,
   X,
+  Settings,
+  LogOut,
 } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
   { label: "Categories", href: "/categories", icon: Tags },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+
+  async function handleLogout() {
+    await authClient.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
 
   const isCurrentPath = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
@@ -99,6 +110,9 @@ export default function Sidebar() {
               );
             })}
           </nav>
+          <button type="button" onClick={handleLogout} className="mt-auto flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white">
+            <LogOut size={18} /> Sign out
+          </button>
         </div>
       </aside>
     </>

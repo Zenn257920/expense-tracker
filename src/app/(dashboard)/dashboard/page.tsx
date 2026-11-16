@@ -5,7 +5,8 @@ import DashboardSkeleton from "@/components/dashboard/dashboard-skeleton";
 import SummaryCard from "@/components/dashboard/summary-card";
 import MonthlyOverview from "@/components/dashboard/monthly-overview";
 import type { DashboardSummary, DashboardApiResponse } from "@/types/dashboard";
-import { formatAmount, formatMoney } from "@/lib/format";
+import { formatAmount } from "@/lib/format";
+import { fetchGet } from "@/lib/client-fetch";
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -24,7 +25,7 @@ export default function DashboardPage() {
 
     async function loadDashboard() {
       try {
-        const response = await fetch("/api/dashboard/summary");
+        const response = await fetchGet("/api/dashboard/summary");
 
         if (!response.ok) {
           throw new Error("Failed to load dashboard data.");

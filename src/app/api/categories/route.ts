@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories } from "@/db/schema";
-import { DEMO_USER_ID } from "@/lib/demo-user";
+import { getAuthSession } from "@/lib/auth-session";
 
 function isUniqueConstraintError(error: unknown) {
   return (
@@ -16,6 +16,8 @@ function isUniqueConstraintError(error: unknown) {
 
 export async function GET() {
   await connection();
+  const session = await getAuthSession();
+  if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
 
   try {
     const result = await db
@@ -25,7 +27,7 @@ export async function GET() {
         type: categories.type,
       })
       .from(categories)
-      .where(eq(categories.userId, DEMO_USER_ID))
+      .where(eq(categories.userId, session.user.id))
       .orderBy(asc(categories.type), asc(categories.name));
 
     return Response.json({
@@ -44,6 +46,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuthSession();
+    if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
     const body = await request.json();
 
     const { name, type } = body;
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
     const [newCategory] = await db
       .insert(categories)
       .values({
-        userId: DEMO_USER_ID,
+        userId: session.user.id,
         name: name.trim(),
         type,
       })

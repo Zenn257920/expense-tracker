@@ -3,7 +3,7 @@ import { and, eq, gte, lt, sql, sum } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
-import { DEMO_USER_ID } from "@/lib/demo-user";
+import { getAuthSession } from "@/lib/auth-session";
 
 function toCents(value: string | null): bigint {
   if (!value) return 0n;
@@ -25,6 +25,8 @@ function formatAmount(cents: bigint): string {
 
 export async function GET() {
   await connection();
+  const session = await getAuthSession();
+  if (!session) return Response.json({ message: "Unauthorized" }, { status: 401 });
 
   try {
     const now = new Date();
@@ -47,7 +49,7 @@ export async function GET() {
       })
       .from(transactions)
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
-      .where(eq(transactions.userId, DEMO_USER_ID))
+      .where(eq(transactions.userId, session.user.id))
       .groupBy(categories.type);
 
     // Aggregate the chart values by month and transaction type.
@@ -61,7 +63,7 @@ export async function GET() {
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
       .where(
         and(
-          eq(transactions.userId, DEMO_USER_ID),
+          eq(transactions.userId, session.user.id),
           gte(transactions.transactionDate, startOfTrend),
           lt(transactions.transactionDate, startOfNextMonth),
         ),

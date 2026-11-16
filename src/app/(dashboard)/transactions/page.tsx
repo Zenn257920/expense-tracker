@@ -7,6 +7,8 @@ import RecentTransactions from "@/components/transactions/recent-transactions";
 import SearchBar from "@/components/ui/search-bar";
 import type { RecentTransaction } from "@/types/dashboard";
 import { useCategories } from "@/hooks/use-categories";
+import { fetchGet } from "@/lib/client-fetch";
+import TransactionsSkeleton from "@/components/transactions/transactions-skeleton";
 
 const LIMIT = 10;
 
@@ -49,7 +51,9 @@ export default function TransactionsPage() {
           search,
         });
 
-        const response = await fetch(`/api/transactions?${params.toString()}`);
+        const response = await fetchGet(
+          `/api/transactions?${params.toString()}`,
+        );
 
         if (!response.ok) {
           throw new Error("Failed to load transactions.");
@@ -90,6 +94,10 @@ export default function TransactionsPage() {
     setError(null);
     setRefreshKey((key) => key + 1);
   }, []);
+
+  if (isLoading) {
+    return <TransactionsSkeleton />;
+  }
 
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-7 text-white sm:px-6 sm:py-10">
