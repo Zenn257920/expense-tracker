@@ -33,7 +33,11 @@ export default function TransactionsPage() {
 
     async function loadTransactions() {
       try {
-        const result = await api.getTransactions({ page, limit: LIMIT, search });
+        const result = await api.getTransactions({
+          page,
+          limit: LIMIT,
+          search,
+        });
 
         if (isActive) {
           setError(null);
@@ -71,9 +75,16 @@ export default function TransactionsPage() {
     <div className="p-4 sm:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">Browse, search, and manage your transactions.</p>
-          <Button variant="zinc" nativeButton={false} render={<Link href="/transactions/new" />}>
-            <Plus data-icon="inline-start" />Add transaction
+          <p className="text-sm text-muted-foreground">
+            Browse, search, and manage your transactions.
+          </p>
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link href="/transactions/new" />}
+          >
+            <Plus data-icon="inline-start" />
+            Add transaction
           </Button>
         </div>
 
@@ -104,7 +115,12 @@ export default function TransactionsPage() {
         {error && (
           <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between">
             <FieldError>{error}</FieldError>
-            <Button variant="outline" onClick={() => void refreshTransactions()}>Try again</Button>
+            <Button
+              variant="outline"
+              onClick={() => void refreshTransactions()}
+            >
+              Try again
+            </Button>
           </div>
         )}
 

@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   LayoutDashboard,
   LogOut,
+  Plus,
   Settings,
   Tags,
   Wallet,
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { Button } from "../ui/button";
 
 const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -182,10 +184,18 @@ export function DashboardHeader() {
         )?.label ?? "Workspace");
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b px-4 sm:px-6">
-      <SidebarTrigger />
-      <div className="h-5 w-px bg-border" />
-      <h1 className="text-sm font-medium text-foreground">{title}</h1>
+    <header className="flex h-14 items-center gap-3 border-b px-4 sm:px-6 justify-between">
+      <div className="flex items-center gap-3">
+        <SidebarTrigger />
+        <div className="h-5 w-px bg-border" />
+        <h1 className="text-sm font-medium text-foreground">{title}</h1>
+      </div>
+      <div>
+        <Button variant="outline">
+          <Plus data-icon="inline-start" />
+          Add Transaction
+        </Button>
+      </div>
     </header>
   );
 }
