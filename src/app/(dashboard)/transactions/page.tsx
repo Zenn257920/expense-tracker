@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import RecentTransactions from "@/components/transactions/recent-transactions";
@@ -16,11 +16,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TransactionType } from "@/types/dashboard";
 import { TablePagination } from "@/components/ui/table-pagination";
 
-const LIMIT = 5;
+const PAGE_SIZE = 5;
+const FETCH_LIMIT = 100;
 type TransactionTypeFilter = "all" | TransactionType;
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<RecentTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,8 +29,6 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalTransactions, setTotalTransactions] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const { categories } = useCategories();
 
@@ -38,18 +37,31 @@ export default function TransactionsPage() {
 
     async function loadTransactions() {
       try {
-        const result = await api.getTransactions({
-          page,
-          limit: LIMIT,
-          search,
-          type: typeFilter,
+        const firstPage = await api.getTransactions({
+          page: 1,
+          limit: FETCH_LIMIT,
+          search: "",
+          type: "all",
         });
+        const remainingPages = await Promise.all(
+          Array.from(
+            { length: Math.max(0, firstPage.pagination.totalPages - 1) },
+            (_, index) =>
+              api.getTransactions({
+                page: index + 2,
+                limit: FETCH_LIMIT,
+                search: "",
+                type: "all",
+              }),
+          ),
+        );
 
         if (isActive) {
           setError(null);
-          setTransactions(result.data);
-          setTotalPages(result.pagination.totalPages);
-          setTotalTransactions(result.pagination.total);
+          setAllTransactions([
+            ...firstPage.data,
+            ...remainingPages.flatMap((result) => result.data),
+          ]);
         }
       } catch (err) {
         if (isActive) {
@@ -65,7 +77,25 @@ export default function TransactionsPage() {
     return () => {
       isActive = false;
     };
-  }, [page, refreshKey, search, typeFilter]);
+  }, [refreshKey]);
+
+  const matchingTransactions = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return allTransactions.filter(
+      (transaction) =>
+        (typeFilter === "all" || transaction.type === typeFilter) &&
+        (!query ||
+          transaction.description.toLocaleLowerCase().includes(query) ||
+          transaction.categoryName.toLocaleLowerCase().includes(query)),
+    );
+  }, [allTransactions, search, typeFilter]);
+  const totalTransactions = matchingTransactions.length;
+  const totalPages = Math.ceil(totalTransactions / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const transactions = matchingTransactions.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   const refreshTransactions = useCallback(() => {
     setIsLoading(true);
@@ -117,19 +147,13 @@ export default function TransactionsPage() {
             hasSearch={Boolean(search)}
             onChange={setSearchInput}
             onSearch={(query) => {
-              if (query !== search || page !== 1) {
-                setIsLoading(true);
-                setError(null);
-              }
+              setError(null);
               setSearch(query);
               setPage(1);
             }}
             onReset={() => {
               setSearchInput("");
-              if (search || page !== 1) {
-                setIsLoading(true);
-                setError(null);
-              }
+              setError(null);
               setSearch("");
               setPage(1);
             }}
@@ -166,15 +190,12 @@ export default function TransactionsPage() {
 
         {!isLoading && !error && totalTransactions > 0 && (
           <TablePagination
-            page={page}
+          page={currentPage}
             totalPages={totalPages}
             totalItems={totalTransactions}
-            pageSize={LIMIT}
+          pageSize={PAGE_SIZE}
             itemLabel="transactions"
-            onPageChange={(nextPage) => {
-              setIsLoading(true);
-              setPage(nextPage);
-            }}
+            onPageChange={setPage}
           />
         )}
       </div>

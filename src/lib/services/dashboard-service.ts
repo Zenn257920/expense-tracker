@@ -19,10 +19,15 @@ function formatAmount(cents: bigint) {
 
 export async function getDashboardSummary(userId: string) {
   const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const startOfMonth = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const startOfTomorrow = new Date(Date.UTC(year, month, now.getUTCDate() + 1)).toISOString().slice(0, 10);
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
   const startOfTrend = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)).toISOString().slice(0, 10);
 
-  const [totals, monthlyResults] = await Promise.all([
+  const [totals, monthlyResults, dailyExpenseResults] = await Promise.all([
     db.select({ type: categories.type, total: sum(transactions.amount) })
       .from(transactions)
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -41,6 +46,16 @@ export async function getDashboardSummary(userId: string) {
         lt(transactions.transactionDate, startOfNextMonth),
       ))
       .groupBy(sql`to_char(${transactions.transactionDate}, 'YYYY-MM')`, categories.type),
+    db.select({ date: transactions.transactionDate, total: sum(transactions.amount) })
+      .from(transactions)
+      .innerJoin(categories, eq(transactions.categoryId, categories.id))
+      .where(and(
+        eq(transactions.userId, userId),
+        eq(categories.type, "expense"),
+        gte(transactions.transactionDate, startOfMonth),
+        lt(transactions.transactionDate, startOfTomorrow),
+      ))
+      .groupBy(transactions.transactionDate),
   ]);
 
   const totalIncome = toCents(totals.find((item) => item.type === "income")?.total ?? null);
@@ -65,10 +80,22 @@ export async function getDashboardSummary(userId: string) {
     };
   });
 
+  const dailyExpenseTotals = new Map(
+    dailyExpenseResults.map((item) => [item.date, toCents(item.total)]),
+  );
+  const dailyExpenses = Array.from({ length: daysInMonth }, (_, index) => {
+    const date = new Date(Date.UTC(year, month, index + 1)).toISOString().slice(0, 10);
+    return {
+      date,
+      expenses: formatAmount(dailyExpenseTotals.get(date) ?? 0n),
+    };
+  });
+
   return {
     totalIncome: formatAmount(totalIncome),
     totalExpenses: formatAmount(totalExpenses),
     balance: formatAmount(totalIncome - totalExpenses),
     monthlyTrend,
+    dailyExpenses,
   };
 }

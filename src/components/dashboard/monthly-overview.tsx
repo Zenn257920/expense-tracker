@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -9,31 +10,50 @@ import {
   YAxis,
 } from "recharts";
 import type { MonthlyTrendPoint } from "@/types/dashboard";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { DailyExpensePoint } from "@/types/dashboard";
 
 interface MonthlyOverviewProps {
-  data: MonthlyTrendPoint[];
+  monthlyData: MonthlyTrendPoint[];
+  dailyExpenses: DailyExpensePoint[];
 }
 
-export default function MonthlyOverview({ data }: MonthlyOverviewProps) {
-  const chartData = data.map((item) => ({
-    ...item,
-    income: Number(item.income),
-    expenses: Number(item.expenses),
-  }));
+type ChartPeriod = "current-month" | "last-six-months";
+
+export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyOverviewProps) {
+  const [period, setPeriod] = useState<ChartPeriod>("current-month");
+  const isCurrentMonth = period === "current-month";
+  const chartData = isCurrentMonth
+    ? dailyExpenses.map((item) => ({ date: item.date, expenses: Number(item.expenses) }))
+    : monthlyData.map((item) => ({
+        month: item.month,
+        income: Number(item.income),
+        expenses: Number(item.expenses),
+      }));
 
   const chartConfig = {
-    income: { label: "Income", color: "#10b981" },
+    ...(isCurrentMonth ? {} : { income: { label: "Income", color: "#10b981" } }),
     expenses: { label: "Expenses", color: "#f43f5e" },
   } satisfies ChartConfig;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Income vs. Expenses</CardTitle>
-        <CardDescription>Monthly cash flow of the last six months</CardDescription>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1.5">
+          <CardTitle>{isCurrentMonth ? "Daily Expenses" : "Income vs. Expenses"}</CardTitle>
+          <CardDescription>
+            {isCurrentMonth ? "Expenses by day for the current month" : "Monthly cash flow of the last six months"}
+          </CardDescription>
+        </div>
+        <Tabs value={period} onValueChange={(value) => value && setPeriod(value as ChartPeriod)}>
+          <TabsList aria-label="Chart period">
+            <TabsTrigger value="current-month">Current Month</TabsTrigger>
+            <TabsTrigger value="last-six-months">Last 6 Months</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-72 w-full sm:h-80">
@@ -54,7 +74,9 @@ export default function MonthlyOverview({ data }: MonthlyOverviewProps) {
 
             <CartesianGrid vertical={false} stroke="#3f3f46" strokeDasharray="3 3" />
             <XAxis
-              dataKey="month"
+              dataKey={isCurrentMonth ? "date" : "month"}
+              tickFormatter={isCurrentMonth ? (value: string) => formatDate(value) : undefined}
+              interval={isCurrentMonth ? Math.max(0, Math.ceil(dailyExpenses.length / 7) - 1) : 0}
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a1a1aa", fontSize: 12 }}
@@ -66,21 +88,30 @@ export default function MonthlyOverview({ data }: MonthlyOverviewProps) {
               tickFormatter={(value: number) => value.toLocaleString("en-US")}
               width={64}
             />
-            <Tooltip content={<ChartTooltipContent formatter={(value) => formatMoney(Number(value))} />} />
+            <Tooltip
+              content={
+                <ChartTooltipContent
+                  labelFormatter={isCurrentMonth ? (value) => formatDate(String(value)) : undefined}
+                  formatter={(value) => formatMoney(Number(value))}
+                />
+              }
+            />
             <ChartLegend
               verticalAlign="top"
               height={36}
               content={<ChartLegendContent verticalAlign="top" />}
             />
-            <Area
-              type="monotone"
-              dataKey="income"
-              name="Income"
-              stroke="#10b981"
-              strokeWidth={2}
-              fill="url(#incomeGradient)"
-              fillOpacity={1}
-            />
+            {!isCurrentMonth && (
+              <Area
+                type="monotone"
+                dataKey="income"
+                name="Income"
+                stroke="#10b981"
+                strokeWidth={2}
+                fill="url(#incomeGradient)"
+                fillOpacity={1}
+              />
+            )}
             <Area
               type="monotone"
               dataKey="expenses"
