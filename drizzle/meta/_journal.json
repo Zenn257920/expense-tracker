@@ -1,3 +1,4 @@
+
 {
   "version": "7",
   "dialect": "postgresql",
@@ -28,6 +29,13 @@
       "version": "7",
       "when": 1794973711976,
       "tag": "0003_brown_steve_rogers",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0004_rename_loan_tables",
       "breakpoints": true
     }
   ]

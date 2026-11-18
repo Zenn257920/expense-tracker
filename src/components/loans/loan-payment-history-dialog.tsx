@@ -39,13 +39,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { api, type DebtPaymentRecord } from "@/lib/api";
+import { api, type LoanPaymentRecord } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
-import { formatMoney } from "@/lib/format";
-import type { Debt } from "@/types/debt";
+import { formatMoneySuffix } from "@/lib/format";
+import type { Loan } from "@/types/loan";
 
-interface DebtPaymentHistoryDialogProps {
-  debt: Debt;
+interface LoanPaymentHistoryDialogProps {
+  loan: Loan;
   onChanged: () => void;
 }
 
@@ -62,25 +62,25 @@ function formatDate(value: string) {
   }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 }
 
-export default function DebtPaymentHistoryDialog({
-  debt,
+export default function LoanPaymentHistoryDialog({
+  loan,
   onChanged,
-}: DebtPaymentHistoryDialogProps) {
+}: LoanPaymentHistoryDialogProps) {
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<Awaited<
-    ReturnType<typeof api.getDebtPayments>
+    ReturnType<typeof api.getLoanPayments>
   > | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [editing, setEditing] = useState<DebtPaymentRecord | null>(null);
+  const [editing, setEditing] = useState<LoanPaymentRecord | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<EditPaymentForm>({
     amount: "",
     paymentDate: "",
     note: "",
   });
-  const [deleteTarget, setDeleteTarget] = useState<DebtPaymentRecord | null>(
+  const [deleteTarget, setDeleteTarget] = useState<LoanPaymentRecord | null>(
     null,
   );
   const [isSaving, setIsSaving] = useState(false);
@@ -94,7 +94,7 @@ export default function DebtPaymentHistoryDialog({
       setIsLoading(true);
       setLoadError(null);
       try {
-        const result = await api.getDebtPayments(debt.id);
+        const result = await api.getLoanPayments(loan.id);
         if (isActive) setHistory(result);
       } catch (err) {
         if (isActive)
@@ -110,13 +110,13 @@ export default function DebtPaymentHistoryDialog({
     return () => {
       isActive = false;
     };
-  }, [debt.id, open, refreshKey]);
+  }, [loan.id, open, refreshKey]);
 
   const reloadHistory = useCallback(() => {
     setRefreshKey((key) => key + 1);
   }, []);
 
-  function startEditing(payment: DebtPaymentRecord) {
+  function startEditing(payment: LoanPaymentRecord) {
     setEditing(payment);
     setEditForm({
       amount: String(payment.amount),
@@ -132,14 +132,14 @@ export default function DebtPaymentHistoryDialog({
     if (!editing || !history) return;
     const amount = Number(editForm.amount);
     const allowedAmount =
-      history.debt.originalAmount - (history.debt.paidAmount - editing.amount);
+      history.loan.originalAmount - (history.loan.paidAmount - editing.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       setActionError("Enter an amount greater than zero.");
       return;
     }
     if (amount > allowedAmount) {
       setActionError(
-        "The edited payment cannot make total payments exceed the original debt amount.",
+        "The edited payment cannot make total payments exceed the original loan amount.",
       );
       return;
     }
@@ -147,7 +147,7 @@ export default function DebtPaymentHistoryDialog({
     setIsSaving(true);
     setActionError(null);
     try {
-      await api.updateDebtPayment(debt.id, editing.id, {
+      await api.updateLoanPayment(loan.id, editing.id, {
         amount,
         paymentDate: editForm.paymentDate,
         note: editForm.note.trim() || undefined,
@@ -169,7 +169,7 @@ export default function DebtPaymentHistoryDialog({
     setIsSaving(true);
     setActionError(null);
     try {
-      await api.deleteDebtPayment(debt.id, deleteTarget.id);
+      await api.deleteLoanPayment(loan.id, deleteTarget.id);
       setDeleteTarget(null);
       toast.success("Payment deleted successfully.");
       reloadHistory();
@@ -196,27 +196,27 @@ export default function DebtPaymentHistoryDialog({
           <DialogHeader>
             <DialogTitle>Payment history</DialogTitle>
             <DialogDescription>
-              Payments for {debt.personName} ({debt.type}).
+              Payments for {loan.personName} ({loan.type}).
             </DialogDescription>
           </DialogHeader>
 
           {history && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Summary
-                label="Original debt"
-                value={formatMoney(history.debt.originalAmount)}
+                label="Original loan"
+                value={formatMoneySuffix(history.loan.originalAmount)}
               />
               <Summary
                 label="Total paid"
-                value={formatMoney(history.debt.paidAmount)}
+                value={formatMoneySuffix(history.loan.paidAmount)}
               />
               <Summary
                 label="Remaining"
-                value={formatMoney(history.debt.remainingAmount)}
+                value={formatMoneySuffix(history.loan.remainingAmount)}
               />
               <Summary
                 label="Payments"
-                value={String(history.debt.paymentCount)}
+                value={String(history.loan.paymentCount)}
               />
             </div>
           )}
@@ -238,7 +238,7 @@ export default function DebtPaymentHistoryDialog({
               <EmptyHeader>
                 <EmptyTitle>No payments recorded</EmptyTitle>
                 <EmptyDescription>
-                  Payments for this debt will appear here.
+                  Payments for this loan will appear here.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -252,7 +252,7 @@ export default function DebtPaymentHistoryDialog({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="font-medium tabular-nums">
-                        {formatMoney(payment.amount)}
+                        {formatMoneySuffix(payment.amount)}
                       </span>
                       <span className="text-sm text-muted-foreground">
                         {formatDate(payment.paymentDate)}
@@ -315,8 +315,8 @@ export default function DebtPaymentHistoryDialog({
                     type="number"
                     min="0.01"
                     max={
-                      history.debt.originalAmount -
-                      (history.debt.paidAmount - editing.amount)
+                      history.loan.originalAmount -
+                      (history.loan.paidAmount - editing.amount)
                     }
                     step="0.01"
                     required
@@ -385,7 +385,7 @@ export default function DebtPaymentHistoryDialog({
             <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `${formatMoney(deleteTarget.amount)} payment from ${formatDate(deleteTarget.paymentDate)} will be removed.`
+                ? `${formatMoneySuffix(deleteTarget.amount)} payment from ${formatDate(deleteTarget.paymentDate)} will be removed.`
                 : "This payment will be removed."}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -5,7 +5,7 @@ import type {
   RecentTransaction,
   TransactionType,
 } from "@/types/dashboard";
-import type { CreateDebtInput, Debt, DebtStatus, DebtType } from "@/types/debt";
+import type { CreateLoanInput, Loan, LoanStatus, LoanType } from "@/types/loan";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -42,36 +42,36 @@ export interface TransactionListResponse {
   };
 }
 
-interface DebtApiRecord {
+interface LoanApiRecord {
   id: string;
   personName: string;
-  type: DebtType;
+  type: LoanType;
   amount: number | string;
   paidAmount: number | string;
   remainingAmount: number | string;
   startDate: string;
   dueDate: string;
   interestRate: number | string;
-  status: DebtStatus;
+  status: LoanStatus;
   description: string | null;
 }
 
-export interface RecentDebtPayment {
+export interface RecentLoanPayment {
   id: string;
   personName: string;
-  type: DebtType;
+  type: LoanType;
   amount: number;
   paymentDate: string;
   note: string | null;
 }
 
-interface DebtListResponse {
+interface LoanListResponse {
   message: string;
-  data: DebtApiRecord[];
-  recentPayments: RecentDebtPayment[];
+  data: LoanApiRecord[];
+  recentPayments: RecentLoanPayment[];
 }
 
-function mapDebt(record: DebtApiRecord): Debt {
+function mapLoan(record: LoanApiRecord): Loan {
   return {
     id: record.id,
     personName: record.personName,
@@ -108,9 +108,9 @@ export interface TransactionInput {
 
 export type TransactionUpdateInput = Partial<TransactionInput>;
 
-export interface DebtUpdateInput {
+export interface LoanUpdateInput {
   personName?: string;
-  type?: DebtType;
+  type?: LoanType;
   amount?: number;
   interestRate?: number;
   startDate?: string;
@@ -118,13 +118,13 @@ export interface DebtUpdateInput {
   description?: string | null;
 }
 
-export interface DebtPaymentInput {
+export interface LoanPaymentInput {
   amount: number;
   paymentDate: string;
   note?: string;
 }
 
-export interface DebtPaymentRecord {
+export interface LoanPaymentRecord {
   id: string;
   amount: number;
   paymentDate: string;
@@ -132,69 +132,69 @@ export interface DebtPaymentRecord {
   createdAt: string;
 }
 
-export interface DebtPaymentHistory {
-  payments: DebtPaymentRecord[];
-  debt: {
+export interface LoanPaymentHistory {
+  payments: LoanPaymentRecord[];
+  loan: {
     id: string;
     originalAmount: number;
     paidAmount: number;
     remainingAmount: number;
     paymentCount: number;
-    status: DebtStatus;
+    status: LoanStatus;
   };
 }
 
 export const api = {
-  async getDebts() {
-    return getOnce("GET /debts", async () => {
-      const response = await apiClient.get<DebtListResponse>("/debts");
+  async getLoans() {
+    return getOnce("GET /loans", async () => {
+      const response = await apiClient.get<LoanListResponse>("/loans");
       return {
-        debts: response.data.data.map(mapDebt),
+        loans: response.data.data.map(mapLoan),
         recentPayments: response.data.recentPayments,
       };
     });
   },
 
-  async createDebt(input: CreateDebtInput) {
-    await apiClient.post<{ message: string; data: unknown }>("/debts", input);
+  async createLoan(input: CreateLoanInput) {
+    await apiClient.post<{ message: string; data: unknown }>("/loans", input);
   },
 
-  async updateDebt(id: string, input: DebtUpdateInput) {
-    await apiClient.patch<ApiResponse<unknown>>(`/debts/${id}`, input);
+  async updateLoan(id: string, input: LoanUpdateInput) {
+    await apiClient.patch<ApiResponse<unknown>>(`/loans/${id}`, input);
   },
 
-  async deleteDebt(id: string) {
-    await apiClient.delete(`/debts/${id}`);
+  async deleteLoan(id: string) {
+    await apiClient.delete(`/loans/${id}`);
   },
 
-  async createDebtPayment(id: string, input: DebtPaymentInput) {
+  async createLoanPayment(id: string, input: LoanPaymentInput) {
     const response = await apiClient.post<ApiResponse<{
-      payment: { id: string; debtId: string; amount: number; paymentDate: string; note: string | null; createdAt: string };
-      debt: { id: string; paidAmount: number; remainingAmount: number; status: DebtStatus };
-    }>>(`/debts/${id}/payments`, input);
+      payment: { id: string; loanId: string; amount: number; paymentDate: string; note: string | null; createdAt: string };
+      loan: { id: string; paidAmount: number; remainingAmount: number; status: LoanStatus };
+    }>>(`/loans/${id}/payments`, input);
     return response.data.data;
   },
 
-  async getDebtPayments(id: string) {
-    const response = await apiClient.get<ApiResponse<DebtPaymentHistory>>(
-      `/debts/${id}/payments`,
+  async getLoanPayments(id: string) {
+    const response = await apiClient.get<ApiResponse<LoanPaymentHistory>>(
+      `/loans/${id}/payments`,
     );
     return response.data.data;
   },
 
-  async updateDebtPayment(
-    debtId: string,
+  async updateLoanPayment(
+    loanId: string,
     paymentId: string,
-    input: Partial<DebtPaymentInput>,
+    input: Partial<LoanPaymentInput>,
   ) {
     await apiClient.patch<ApiResponse<unknown>>(
-      `/debts/${debtId}/payments/${paymentId}`,
+      `/loans/${loanId}/payments/${paymentId}`,
       input,
     );
   },
 
-  async deleteDebtPayment(debtId: string, paymentId: string) {
-    await apiClient.delete(`/debts/${debtId}/payments/${paymentId}`);
+  async deleteLoanPayment(loanId: string, paymentId: string) {
+    await apiClient.delete(`/loans/${loanId}/payments/${paymentId}`);
   },
 
   async getCategories() {

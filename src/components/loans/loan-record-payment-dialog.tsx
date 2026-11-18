@@ -16,21 +16,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/api-client";
-import { formatMoney } from "@/lib/format";
-import type { Debt } from "@/types/debt";
+import { formatMoneySuffix } from "@/lib/format";
+import type { Loan } from "@/types/loan";
 
-interface RecordPaymentDialogProps {
-  debt: Debt;
+interface LoanRecordPaymentDialogProps {
+  loan: Loan;
   onPayment: (
-    debtId: string,
+    loanId: string,
     input: { amount: number; paymentDate: string; note?: string },
   ) => Promise<void>;
 }
 
-export default function RecordPaymentDialog({
-  debt,
+export default function LoanRecordPaymentDialog({
+  loan,
   onPayment,
-}: RecordPaymentDialogProps) {
+}: LoanRecordPaymentDialogProps) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(
@@ -47,7 +47,7 @@ export default function RecordPaymentDialog({
       setError("Enter a payment amount greater than zero.");
       return;
     }
-    if (numericAmount > debt.remainingAmount) {
+    if (numericAmount > loan.remainingAmount) {
       setError("Payment cannot exceed the remaining balance.");
       return;
     }
@@ -55,7 +55,7 @@ export default function RecordPaymentDialog({
     setIsSaving(true);
     setError(null);
     try {
-      await onPayment(debt.id, {
+      await onPayment(loan.id, {
         amount: numericAmount,
         paymentDate,
         note: note.trim() || undefined,
@@ -84,57 +84,57 @@ export default function RecordPaymentDialog({
         <DialogHeader>
           <DialogTitle>Record a payment</DialogTitle>
           <DialogDescription>
-            {debt.type === "borrowed"
+            {loan.type === "borrowed"
               ? "Record a repayment you made"
               : "Record a repayment you received"}{" "}
-            for {debt.personName}.
+            for {loan.personName}.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/30 p-3 text-sm sm:grid-cols-3">
           <div className="flex min-w-0 items-center justify-between gap-3 sm:block">
             <p className="text-xs text-muted-foreground">Original</p>
-            <p className="truncate text-right font-medium sm:text-left">{formatMoney(debt.amount)}</p>
+            <p className="truncate text-right font-medium sm:text-left">{formatMoneySuffix(loan.amount)}</p>
           </div>
           <div className="flex min-w-0 items-center justify-between gap-3 sm:block">
             <p className="text-xs text-muted-foreground">Paid</p>
-            <p className="truncate text-right font-medium sm:text-left">{formatMoney(debt.paidAmount)}</p>
+            <p className="truncate text-right font-medium sm:text-left">{formatMoneySuffix(loan.paidAmount)}</p>
           </div>
           <div className="flex min-w-0 items-center justify-between gap-3 sm:block">
             <p className="text-xs text-muted-foreground">Remaining</p>
-            <p className="truncate text-right font-medium sm:text-left">{formatMoney(debt.remainingAmount)}</p>
+            <p className="truncate text-right font-medium sm:text-left">{formatMoneySuffix(loan.remainingAmount)}</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor={`payment-amount-${debt.id}`}>
+            <Label htmlFor={`payment-amount-${loan.id}`}>
               Payment amount (MMK)
             </Label>
             <Input
-              id={`payment-amount-${debt.id}`}
+              id={`payment-amount-${loan.id}`}
               type="number"
               min="0.01"
-              max={debt.remainingAmount}
+              max={loan.remainingAmount}
               step="0.01"
               required
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
-              placeholder={`Up to ${debt.remainingAmount.toLocaleString()}`}
+              placeholder={`Up to ${loan.remainingAmount.toLocaleString()}`}
             />
             <button
               type="button"
               className="text-xs text-primary underline-offset-4 hover:underline"
-              onClick={() => setAmount(String(debt.remainingAmount))}
+              onClick={() => setAmount(String(loan.remainingAmount))}
             >
               Pay remaining balance
             </button>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={`payment-date-${debt.id}`}>Payment date</Label>
+            <Label htmlFor={`payment-date-${loan.id}`}>Payment date</Label>
             <Input
-              id={`payment-date-${debt.id}`}
+              id={`payment-date-${loan.id}`}
               type="date"
               required
               value={paymentDate}
@@ -143,9 +143,9 @@ export default function RecordPaymentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={`payment-note-${debt.id}`}>Note (Optional)</Label>
+            <Label htmlFor={`payment-note-${loan.id}`}>Note (Optional)</Label>
             <Textarea
-              id={`payment-note-${debt.id}`}
+              id={`payment-note-${loan.id}`}
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={2000}
@@ -159,7 +159,7 @@ export default function RecordPaymentDialog({
             type="submit"
             variant="outline"
             className="w-full"
-            disabled={isSaving || debt.remainingAmount <= 0}
+            disabled={isSaving || loan.remainingAmount <= 0}
           >
             {isSaving ? "Saving payment..." : "Save payment"}
           </Button>

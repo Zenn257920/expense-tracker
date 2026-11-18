@@ -9,8 +9,19 @@ import { formatAmount } from "@/lib/format";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -37,9 +48,7 @@ export default function DashboardPage() {
         }
       } catch (err) {
         if (isActive) {
-          setError(
-            getApiErrorMessage(err, "Could not load dashboard data."),
-          );
+          setError(getApiErrorMessage(err, "Could not load dashboard data."));
         }
       } finally {
         if (isActive) setIsLoading(false);
@@ -65,14 +74,23 @@ export default function DashboardPage() {
             <CardTitle>Could not load your dashboard</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
-          <CardContent><Button onClick={refreshDashboard}>Try again</Button></CardContent>
+          <CardContent>
+            <Button onClick={refreshDashboard}>Try again</Button>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   if (!summary) {
-    return <Empty className="m-6 border"><EmptyHeader><EmptyTitle>No dashboard data</EmptyTitle><EmptyDescription>Try refreshing the page.</EmptyDescription></EmptyHeader></Empty>;
+    return (
+      <Empty className="m-6 border">
+        <EmptyHeader>
+          <EmptyTitle>No dashboard data</EmptyTitle>
+          <EmptyDescription>Try refreshing the page.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
   }
 
   return (

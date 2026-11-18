@@ -10,20 +10,20 @@ import {
 import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 
-import AddDebtDialog from "@/components/debits/add-debt-dialog";
-import DebtSummary from "@/components/debits/debt-summary";
-import DebtDashboardOverview from "@/components/debits/debt-dashboard-overview";
-import DebtPaymentHistoryDialog from "@/components/debits/debt-payment-history-dialog";
-import RecordPaymentDialog from "@/components/debits/record-payment-dialog";
-import RecentPaymentsDialog from "@/components/debits/recent-payments-dialog";
+import AddLoanDialog from "@/components/loans/add-loan-dialog";
+import LoanSummary from "@/components/loans/loan-summary";
+import LoanDashboardOverview from "@/components/loans/loan-dashboard-overview";
+import LoanPaymentHistoryDialog from "@/components/loans/loan-payment-history-dialog";
+import LoanRecordPaymentDialog from "@/components/loans/loan-record-payment-dialog";
+import LoanRecentPaymentsDialog from "@/components/loans/loan-recent-payments-dialog";
 import { api } from "@/lib/api";
-import type { DebtPaymentInput, RecentDebtPayment } from "@/lib/api";
+import type { LoanPaymentInput, RecentLoanPayment } from "@/lib/api";
 import {
-  calculateDebtOverview,
-  calculateDebtProgress,
-} from "@/lib/debt-analytics";
+  calculateLoanOverview,
+  calculateLoanProgress,
+} from "@/lib/loan-analytics";
 import { getApiErrorMessage } from "@/lib/api-client";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatMoneySuffix, formatNumericDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,93 +64,93 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { CreateDebtInput, Debt, DebtType } from "@/types/debt";
+import type { CreateLoanInput, Loan, LoanType } from "@/types/loan";
 
-type DebtFilter = "all" | DebtType;
-type DebtEditForm = CreateDebtInput;
+type LoanFilter = "all" | LoanType;
+type LoanEditForm = CreateLoanInput;
 
-const statusLabels: Record<Debt["status"], string> = {
-  active: "Active",
+const statusLabels: Record<Loan["status"], string> = {
+  active: "Unpaid",
   partially_paid: "Partially paid",
   paid: "Paid",
   overdue: "Overdue",
 };
-const DEBT_PAGE_SIZE = 5;
+const LOAN_PAGE_SIZE = 5;
 
-export default function DebtPage() {
-  const [debts, setDebts] = useState<Debt[]>([]);
-  const [recentPayments, setRecentPayments] = useState<RecentDebtPayment[]>([]);
+export default function LoanPage() {
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [recentPayments, setRecentPayments] = useState<RecentLoanPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<DebtFilter>("all");
+  const [filter, setFilter] = useState<LoanFilter>("all");
   const [search, setSearch] = useState("");
-  const [debtPage, setDebtPage] = useState(1);
+  const [loanPage, setLoanPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [editing, setEditing] = useState<Debt | null>(null);
-  const [editForm, setEditForm] = useState<DebtEditForm | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Debt | null>(null);
+  const [editing, setEditing] = useState<Loan | null>(null);
+  const [editForm, setEditForm] = useState<LoanEditForm | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Loan | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
 
-    async function loadDebts() {
+    async function loadLoans() {
       try {
-        const result = await api.getDebts();
+        const result = await api.getLoans();
         if (isActive) {
-          setDebts(result.debts);
+          setLoans(result.loans);
           setRecentPayments(result.recentPayments);
           setError(null);
         }
       } catch (err) {
         if (isActive)
-          setError(getApiErrorMessage(err, "Could not load debts."));
+          setError(getApiErrorMessage(err, "Could not load loans."));
       } finally {
         if (isActive) setIsLoading(false);
       }
     }
 
-    void loadDebts();
+    void loadLoans();
     return () => {
       isActive = false;
     };
   }, [refreshKey]);
 
-  const refreshDebts = useCallback((showLoading = true) => {
+  const refreshLoans = useCallback((showLoading = true) => {
     if (showLoading) setIsLoading(true);
     setError(null);
     setRefreshKey((key) => key + 1);
   }, []);
 
-  async function handleAddDebt(data: CreateDebtInput) {
+  async function handleAddLoan(data: CreateLoanInput) {
     try {
-      await api.createDebt(data);
-      refreshDebts();
-      toast.success("Debt added successfully.");
+      await api.createLoan(data);
+      refreshLoans();
+      toast.success("Loan added successfully.");
     } catch (err) {
-      setError(getApiErrorMessage(err, "Could not create debt."));
+      setError(getApiErrorMessage(err, "Could not create loan."));
       throw err;
     }
   }
 
-  async function handleRecordPayment(debtId: string, input: DebtPaymentInput) {
-    await api.createDebtPayment(debtId, input);
+  async function handleRecordPayment(loanId: string, input: LoanPaymentInput) {
+    await api.createLoanPayment(loanId, input);
     toast.success("Payment recorded successfully.");
-    refreshDebts();
+    refreshLoans();
   }
 
-  function startEditing(debt: Debt) {
-    setEditing(debt);
+  function startEditing(loan: Loan) {
+    setEditing(loan);
     setActionError(null);
     setEditForm({
-      personName: debt.personName,
-      type: debt.type,
-      amount: debt.amount,
-      borrowedDate: debt.borrowedDate.slice(0, 10),
-      dueDate: debt.dueDate.slice(0, 10),
-      interestRate: debt.interestRate,
-      description: debt.description ?? "",
+      personName: loan.personName,
+      type: loan.type,
+      amount: loan.amount,
+      borrowedDate: loan.borrowedDate.slice(0, 10),
+      dueDate: loan.dueDate.slice(0, 10),
+      interestRate: loan.interestRate,
+      description: loan.description ?? "",
     });
   }
 
@@ -164,7 +164,7 @@ export default function DebtPage() {
     setIsSaving(true);
     setActionError(null);
     try {
-      await api.updateDebt(editing.id, {
+      await api.updateLoan(editing.id, {
         personName: editForm.personName.trim(),
         type: editForm.type,
         amount: Number(editForm.amount),
@@ -175,10 +175,10 @@ export default function DebtPage() {
       });
       setEditing(null);
       setEditForm(null);
-      toast.success("Debt updated successfully.");
-      refreshDebts();
+      toast.success("Loan updated successfully.");
+      refreshLoans();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Failed to update debt."));
+      setActionError(getApiErrorMessage(err, "Failed to update loan."));
     } finally {
       setIsSaving(false);
     }
@@ -189,63 +189,63 @@ export default function DebtPage() {
     setIsSaving(true);
     setActionError(null);
     try {
-      await api.deleteDebt(deleteTarget.id);
+      await api.deleteLoan(deleteTarget.id);
       setDeleteTarget(null);
-      toast.success("Debt deleted successfully.");
-      refreshDebts();
+      toast.success("Loan deleted successfully.");
+      refreshLoans();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Failed to delete debt."));
+      setActionError(getApiErrorMessage(err, "Failed to delete loan."));
       setDeleteTarget(null);
     } finally {
       setIsSaving(false);
     }
   }
 
-  const visibleDebts = useMemo(() => {
+  const visibleLoans = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return debts.filter(
-      (debt) =>
-        (filter === "all" || debt.type === filter) &&
+    return loans.filter(
+      (loan) =>
+        (filter === "all" || loan.type === filter) &&
         (!query ||
-          debt.personName.toLocaleLowerCase().includes(query) ||
-          debt.description?.toLocaleLowerCase().includes(query)),
+          loan.personName.toLocaleLowerCase().includes(query) ||
+          loan.description?.toLocaleLowerCase().includes(query)),
     );
-  }, [debts, filter, search]);
-  const debtTotalPages = Math.ceil(visibleDebts.length / DEBT_PAGE_SIZE);
-  const currentDebtPage = Math.min(debtPage, Math.max(1, debtTotalPages));
-  const paginatedDebts = visibleDebts.slice(
-    (currentDebtPage - 1) * DEBT_PAGE_SIZE,
-    currentDebtPage * DEBT_PAGE_SIZE,
+  }, [loans, filter, search]);
+  const loanTotalPages = Math.ceil(visibleLoans.length / LOAN_PAGE_SIZE);
+  const currentLoanPage = Math.min(loanPage, Math.max(1, loanTotalPages));
+  const paginatedLoans = visibleLoans.slice(
+    (currentLoanPage - 1) * LOAN_PAGE_SIZE,
+    currentLoanPage * LOAN_PAGE_SIZE,
   );
 
-  const overview = useMemo(() => calculateDebtOverview(debts), [debts]);
+  const overview = useMemo(() => calculateLoanOverview(loans), [loans]);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 p-4 sm:p-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Debt Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Loan Management</h1>
           <p className="text-muted-foreground">
             Manage money you borrowed and money you lent.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <RecentPaymentsDialog
+          <LoanRecentPaymentsDialog
             payments={recentPayments}
             isLoading={isLoading}
             error={error}
           />
-          <AddDebtDialog onAdd={handleAddDebt} />
+          <AddLoanDialog onAdd={handleAddLoan} />
         </div>
       </div>
 
-      <DebtSummary
+      <LoanSummary
         overview={overview}
         isLoading={isLoading}
         hasError={Boolean(error)}
       />
 
-      <DebtDashboardOverview
+      <LoanDashboardOverview
         overview={overview}
         isLoading={isLoading}
         error={error}
@@ -258,13 +258,13 @@ export default function DebtPage() {
             value={filter}
             onValueChange={(value) => {
               if (value) {
-                setFilter(value as DebtFilter);
-                setDebtPage(1);
+                setFilter(value as LoanFilter);
+                setLoanPage(1);
               }
             }}
           >
             <TabsList>
-              <TabsTrigger value="all">All debts</TabsTrigger>
+              <TabsTrigger value="all">All loans</TabsTrigger>
               <TabsTrigger value="borrowed">Borrowed</TabsTrigger>
               <TabsTrigger value="lent">Lent</TabsTrigger>
             </TabsList>
@@ -273,10 +273,10 @@ export default function DebtPage() {
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
-              setDebtPage(1);
+              setLoanPage(1);
             }}
             placeholder="Search people or descriptions..."
-            aria-label="Search debts"
+            aria-label="Search loans"
             className="sm:max-w-xs"
           />
         </div>
@@ -284,24 +284,24 @@ export default function DebtPage() {
         {error ? (
           <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between">
             <FieldError>{error}</FieldError>
-            <Button variant="outline" onClick={() => refreshDebts()}>
+            <Button variant="outline" onClick={() => refreshLoans()}>
               Try again
             </Button>
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-            <Spinner /> Loading debts...
+            <Spinner /> Loading loans...
           </div>
-        ) : visibleDebts.length === 0 ? (
+        ) : visibleLoans.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>
               <EmptyTitle>
-                {debts.length === 0 ? "No debts yet" : "No matching debts"}
+                {loans.length === 0 ? "No loans yet" : "No matching loans"}
               </EmptyTitle>
               <EmptyDescription>
-                {debts.length === 0
-                  ? "Add a debt to see your balances here."
-                  : "Try changing your search or debt type."}
+                {loans.length === 0
+                  ? "Add a loan to see your balances here."
+                  : "Try changing your search or loan type."}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -325,38 +325,38 @@ export default function DebtPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedDebts.map((debt) => (
-                  <TableRow key={debt.id}>
+                {paginatedLoans.map((loan) => (
+                  <TableRow key={loan.id}>
                     <TableCell className="max-w-56">
                       <div className="truncate font-medium">
-                        {debt.personName}
+                        {loan.personName}
                       </div>
-                      {debt.description && (
+                      {loan.description && (
                         <div className="truncate text-xs text-muted-foreground">
-                          {debt.description}
+                          {loan.description}
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="capitalize">{debt.type}</TableCell>
-                    <TableCell>{formatDate(debt.borrowedDate)}</TableCell>
-                    <TableCell>{formatDate(debt.dueDate)}</TableCell>
+                    <TableCell className="capitalize">{loan.type}</TableCell>
+                    <TableCell>{formatNumericDate(loan.borrowedDate)}</TableCell>
+                    <TableCell>{formatNumericDate(loan.dueDate)}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMoney(debt.amount)}
+                      {formatMoneySuffix(loan.amount)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMoney(debt.paidAmount)}
+                      {formatMoneySuffix(loan.paidAmount)}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
-                      {formatMoney(debt.remainingAmount)}
+                      {formatMoneySuffix(loan.remainingAmount)}
                     </TableCell>
                     <TableCell>
                       <div className="flex min-w-24 flex-col gap-1">
                         <span className="text-xs tabular-nums text-muted-foreground">
-                          {calculateDebtProgress(debt).toFixed(1)}%
+                          {calculateLoanProgress(loan).toFixed(1)}%
                         </span>
                         <Progress
-                          value={calculateDebtProgress(debt)}
-                          aria-label={`${debt.personName} repayment progress`}
+                          value={calculateLoanProgress(loan)}
+                          aria-label={`${loan.personName} repayment progress`}
                           className="gap-0"
                         />
                       </div>
@@ -364,34 +364,34 @@ export default function DebtPage() {
                     <TableCell>
                       <Badge
                         variant={
-                          debt.status === "overdue"
+                          loan.status === "overdue"
                             ? "destructive"
-                            : debt.status === "paid"
+                            : loan.status === "paid"
                               ? "secondary"
                               : "outline"
                         }
                       >
-                        {statusLabels[debt.status]}
+                        {statusLabels[loan.status]}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-2">
-                        {debt.remainingAmount > 0 && (
-                          <RecordPaymentDialog
-                            debt={debt}
+                        {loan.remainingAmount > 0 && (
+                          <LoanRecordPaymentDialog
+                            loan={loan}
                             onPayment={handleRecordPayment}
                           />
                         )}
-                        <DebtPaymentHistoryDialog
-                          debt={debt}
-                          onChanged={() => refreshDebts(false)}
+                        <LoanPaymentHistoryDialog
+                          loan={loan}
+                          onChanged={() => refreshLoans(false)}
                         />
                         <Button
                           type="button"
                           variant="outline"
                           size="icon-sm"
-                          aria-label="Edit debt"
-                          onClick={() => startEditing(debt)}
+                          aria-label="Edit loan"
+                          onClick={() => startEditing(loan)}
                         >
                           <Pencil data-icon="inline-start" />
                         </Button>
@@ -399,8 +399,8 @@ export default function DebtPage() {
                           type="button"
                           variant="destructive"
                           size="icon-sm"
-                          aria-label="Delete debt"
-                          onClick={() => setDeleteTarget(debt)}
+                          aria-label="Delete loan"
+                          onClick={() => setDeleteTarget(loan)}
                         >
                           <Trash2 data-icon="inline-start" />
                         </Button>
@@ -412,14 +412,14 @@ export default function DebtPage() {
             </Table>
           </div>
         )}
-        {!error && !isLoading && visibleDebts.length > 0 && (
+        {!error && !isLoading && visibleLoans.length > 0 && (
           <TablePagination
-            page={currentDebtPage}
-            totalPages={debtTotalPages}
-            totalItems={visibleDebts.length}
-            pageSize={DEBT_PAGE_SIZE}
-            itemLabel="debts"
-            onPageChange={setDebtPage}
+            page={currentLoanPage}
+            totalPages={loanTotalPages}
+            totalItems={visibleLoans.length}
+            pageSize={LOAN_PAGE_SIZE}
+            itemLabel="loans"
+            onPageChange={setLoanPage}
           />
         )}
       </section>
@@ -436,7 +436,7 @@ export default function DebtPage() {
       >
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit debt</DialogTitle>
+            <DialogTitle>Edit loan</DialogTitle>
             <DialogDescription>
               Update the details for {editing?.personName}.
             </DialogDescription>
@@ -445,11 +445,11 @@ export default function DebtPage() {
             <form onSubmit={handleUpdate} className="flex flex-col gap-4">
               <FieldGroup className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field>
-                  <FieldLabel htmlFor={`debt-person-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-person-${editing.id}`}>
                     Person
                   </FieldLabel>
                   <Input
-                    id={`debt-person-${editing.id}`}
+                    id={`loan-person-${editing.id}`}
                     value={editForm.personName}
                     onChange={(event) =>
                       setEditForm({
@@ -462,16 +462,16 @@ export default function DebtPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`debt-type-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-type-${editing.id}`}>
                     Type
                   </FieldLabel>
                   <select
-                    id={`debt-type-${editing.id}`}
+                    id={`loan-type-${editing.id}`}
                     value={editForm.type}
                     onChange={(event) =>
                       setEditForm({
                         ...editForm,
-                        type: event.target.value as DebtType,
+                        type: event.target.value as LoanType,
                       })
                     }
                     className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
@@ -481,11 +481,11 @@ export default function DebtPage() {
                   </select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`debt-amount-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-amount-${editing.id}`}>
                     Amount (MMK)
                   </FieldLabel>
                   <Input
-                    id={`debt-amount-${editing.id}`}
+                    id={`loan-amount-${editing.id}`}
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -500,11 +500,11 @@ export default function DebtPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`debt-interest-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-interest-${editing.id}`}>
                     Interest rate (%)
                   </FieldLabel>
                   <Input
-                    id={`debt-interest-${editing.id}`}
+                    id={`loan-interest-${editing.id}`}
                     type="number"
                     min="0"
                     max="100"
@@ -520,11 +520,11 @@ export default function DebtPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`debt-start-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-start-${editing.id}`}>
                     Start date
                   </FieldLabel>
                   <Input
-                    id={`debt-start-${editing.id}`}
+                    id={`loan-start-${editing.id}`}
                     type="date"
                     value={editForm.borrowedDate}
                     onChange={(event) =>
@@ -537,11 +537,11 @@ export default function DebtPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`debt-due-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-due-${editing.id}`}>
                     Due date
                   </FieldLabel>
                   <Input
-                    id={`debt-due-${editing.id}`}
+                    id={`loan-due-${editing.id}`}
                     type="date"
                     min={editForm.borrowedDate}
                     value={editForm.dueDate}
@@ -552,11 +552,11 @@ export default function DebtPage() {
                   />
                 </Field>
                 <Field className="sm:col-span-2">
-                  <FieldLabel htmlFor={`debt-description-${editing.id}`}>
+                  <FieldLabel htmlFor={`loan-description-${editing.id}`}>
                     Description
                   </FieldLabel>
                   <Input
-                    id={`debt-description-${editing.id}`}
+                    id={`loan-description-${editing.id}`}
                     value={editForm.description ?? ""}
                     onChange={(event) =>
                       setEditForm({
@@ -596,9 +596,9 @@ export default function DebtPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this debt?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this loan?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the debt with{" "}
+              Are you sure you want to delete the loan with{" "}
               {deleteTarget?.personName}?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -609,7 +609,7 @@ export default function DebtPage() {
               onClick={handleDelete}
               disabled={isSaving}
             >
-              {isSaving ? "Deleting..." : "Delete debt"}
+              {isSaving ? "Deleting..." : "Delete loan"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

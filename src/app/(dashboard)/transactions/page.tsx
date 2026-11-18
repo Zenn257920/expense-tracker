@@ -21,7 +21,9 @@ const FETCH_LIMIT = 100;
 type TransactionTypeFilter = "all" | TransactionType;
 
 export default function TransactionsPage() {
-  const [allTransactions, setAllTransactions] = useState<RecentTransaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<RecentTransaction[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,10 +192,10 @@ export default function TransactionsPage() {
 
         {!isLoading && !error && totalTransactions > 0 && (
           <TablePagination
-          page={currentPage}
+            page={currentPage}
             totalPages={totalPages}
             totalItems={totalTransactions}
-          pageSize={PAGE_SIZE}
+            pageSize={PAGE_SIZE}
             itemLabel="transactions"
             onPageChange={setPage}
           />

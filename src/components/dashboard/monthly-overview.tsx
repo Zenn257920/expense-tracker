@@ -85,8 +85,12 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
             <CartesianGrid vertical={false} stroke="#3f3f46" strokeDasharray="3 3" />
             <XAxis
               dataKey={isCurrentMonth ? "date" : "month"}
-              tickFormatter={isCurrentMonth ? (value: string) => formatDate(value) : undefined}
-              interval={isCurrentMonth ? Math.max(0, Math.ceil(dailyTrend.length / 7) - 1) : 0}
+              tickFormatter={
+                isCurrentMonth
+                  ? (value: string) => formatDate(value).replace(/, \d{4}$/, "")
+                  : undefined
+              }
+              interval={isCurrentMonth ? Math.max(0, Math.ceil(dailyTrend.length / 5) - 1) : 0}
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a1a1aa", fontSize: 12 }}

@@ -3,11 +3,11 @@ import { z } from "zod";
 import { ApiError, apiErrorResponse, readJson } from "@/lib/api-error";
 import { getAuthSession } from "@/lib/auth-session";
 import {
-  createDebtPayment,
-  getDebtPayments,
-} from "@/lib/services/debt-payment-service";
+  createLoanPayment,
+  getLoanPayments,
+} from "@/lib/services/loan-payment-service";
 
-const debtIdSchema = z.uuid();
+const loanIdSchema = z.uuid();
 
 export async function GET(
   _request: Request,
@@ -18,13 +18,13 @@ export async function GET(
 
   try {
     const { id } = await params;
-    if (!debtIdSchema.safeParse(id).success) {
-      throw new ApiError("Invalid debt ID", 400);
+    if (!loanIdSchema.safeParse(id).success) {
+      throw new ApiError("Invalid loan ID", 400);
     }
-    const data = await getDebtPayments(session.user.id, id);
+    const data = await getLoanPayments(session.user.id, id);
     return Response.json({ success: true, data });
   } catch (error) {
-    return apiErrorResponse(error, "Failed to retrieve debt payments");
+    return apiErrorResponse(error, "Failed to retrieve loan payments");
   }
 }
 
@@ -37,11 +37,11 @@ export async function POST(
 
   try {
     const { id } = await params;
-    if (!debtIdSchema.safeParse(id).success) {
-      throw new ApiError("Invalid debt ID", 400);
+    if (!loanIdSchema.safeParse(id).success) {
+      throw new ApiError("Invalid loan ID", 400);
     }
 
-    const result = await createDebtPayment(
+    const result = await createLoanPayment(
       session.user.id,
       id,
       await readJson(request),
@@ -52,6 +52,6 @@ export async function POST(
       { status: 201 },
     );
   } catch (error) {
-    return apiErrorResponse(error, "Failed to record debt payment");
+    return apiErrorResponse(error, "Failed to record loan payment");
   }
 }

@@ -4,14 +4,14 @@ import { z } from "zod";
 
 import { desc, eq, inArray, sum } from "drizzle-orm";
 import { db } from "@/db";
-import { debts, debtPayments } from "@/db/schema";
+import { loans, loanPayments } from "@/db/schema";
 import { auth } from "@/lib/auth";
 
 // ==========================================
 // 1. VALIDATION SCHEMA
 // ==========================================
 
-const createDebtSchema = z
+const createLoanSchema = z
   .object({
     personName: z.string().trim().min(1, "Person name is required").max(255),
 
@@ -63,12 +63,12 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     // Validate request data
-    const validation = createDebtSchema.safeParse(body);
+    const validation = createLoanSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
         {
-          message: "Invalid debt information",
+          message: "Invalid loan information",
           errors: validation.error.flatten(),
         },
         { status: 400 },
@@ -78,8 +78,8 @@ export async function POST(request: Request) {
     const data = validation.data;
 
     // Insert into database
-    const [newDebt] = await db
-      .insert(debts)
+    const [newLoan] = await db
+      .insert(loans)
       .values({
         userId: session.user.id,
         personName: data.personName,
@@ -92,19 +92,19 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    // Return created debt
+    // Return created loan
     return NextResponse.json(
       {
-        message: "Debt created successfully",
-        data: newDebt,
+        message: "Loan created successfully",
+        data: newLoan,
       },
       { status: 201 },
     );
   } catch (error) {
-    console.error("CREATE_DEBT_ERROR:", error);
+    console.error("CREATE_LOAN_ERROR:", error);
 
     return NextResponse.json(
-      { message: "Something went wrong while creating debt" },
+      { message: "Something went wrong while creating loan" },
       { status: 500 },
     );
   }
@@ -124,54 +124,54 @@ export async function GET() {
       );
     }
 
-    // 2. Get only debts belonging to the logged-in user
-    const [userDebts, recentPayments] = await Promise.all([
+    // 2. Get only loans belonging to the logged-in user
+    const [userLoans, recentPayments] = await Promise.all([
       db
         .select()
-        .from(debts)
-        .where(eq(debts.userId, session.user.id))
-        .orderBy(debts.createdAt),
+        .from(loans)
+        .where(eq(loans.userId, session.user.id))
+        .orderBy(loans.createdAt),
       db
         .select({
-          id: debtPayments.id,
-          personName: debts.personName,
-          type: debts.type,
-          amount: debtPayments.amount,
-          paymentDate: debtPayments.paymentDate,
-          note: debtPayments.note,
+          id: loanPayments.id,
+          personName: loans.personName,
+          type: loans.type,
+          amount: loanPayments.amount,
+          paymentDate: loanPayments.paymentDate,
+          note: loanPayments.note,
         })
-        .from(debtPayments)
-        .innerJoin(debts, eq(debtPayments.debtId, debts.id))
-        .where(eq(debts.userId, session.user.id))
-        .orderBy(desc(debtPayments.paymentDate), desc(debtPayments.createdAt))
+        .from(loanPayments)
+        .innerJoin(loans, eq(loanPayments.loanId, loans.id))
+        .where(eq(loans.userId, session.user.id))
+        .orderBy(desc(loanPayments.paymentDate), desc(loanPayments.createdAt))
         .limit(5),
     ]);
 
-    // 3. If the user has no debts, return an empty array
-    if (userDebts.length === 0) {
+    // 3. If the user has no loans, return an empty array
+    if (userLoans.length === 0) {
       return NextResponse.json({
-        message: "Debts retrieved successfully",
+        message: "Loans retrieved successfully",
         data: [],
         recentPayments,
       });
     }
 
-    // 4. Get all payment totals for these debts
-    const debtIds = userDebts.map((debt) => debt.id);
+    // 4. Get all payment totals for these loans
+    const loanIds = userLoans.map((loan) => loan.id);
 
     const paymentTotals = await db
       .select({
-        debtId: debtPayments.debtId,
-        paidAmount: sum(debtPayments.amount),
+        loanId: loanPayments.loanId,
+        paidAmount: sum(loanPayments.amount),
       })
-      .from(debtPayments)
-      .where(inArray(debtPayments.debtId, debtIds))
-      .groupBy(debtPayments.debtId);
+      .from(loanPayments)
+      .where(inArray(loanPayments.loanId, loanIds))
+      .groupBy(loanPayments.loanId);
 
-    // 5. Create a lookup for each debt's total payments
+    // 5. Create a lookup for each loan's total payments
     const paymentMap = new Map(
       paymentTotals.map((payment) => [
-        payment.debtId,
+        payment.loanId,
         Number(payment.paidAmount ?? 0),
       ]),
     );
@@ -179,16 +179,16 @@ export async function GET() {
     // 6. Calculate remaining balance and status
     const today = new Date().toISOString().slice(0, 10);
 
-    const result = userDebts.map((debt) => {
-      const paidAmount = paymentMap.get(debt.id) ?? 0;
+    const result = userLoans.map((loan) => {
+      const paidAmount = paymentMap.get(loan.id) ?? 0;
 
-      const remainingAmount = Math.max(0, Number(debt.amount) - paidAmount);
+      const remainingAmount = Math.max(0, Number(loan.amount) - paidAmount);
 
       let status: "active" | "partially_paid" | "paid" | "overdue";
 
       if (remainingAmount <= 0) {
         status = "paid";
-      } else if (debt.dueDate < today) {
+      } else if (loan.dueDate < today) {
         status = "overdue";
       } else if (paidAmount > 0) {
         status = "partially_paid";
@@ -197,7 +197,7 @@ export async function GET() {
       }
 
       return {
-        ...debt,
+        ...loan,
         paidAmount,
         remainingAmount,
         status,
@@ -206,15 +206,15 @@ export async function GET() {
 
     // 7. Return the result
     return NextResponse.json({
-      message: "Debts retrieved successfully",
+      message: "Loans retrieved successfully",
       data: result,
       recentPayments,
     });
   } catch (error) {
-    console.error("GET_DEBTS_ERROR:", error);
+    console.error("GET_LOANS_ERROR:", error);
 
     return NextResponse.json(
-      { message: "Something went wrong while retrieving debts" },
+      { message: "Something went wrong while retrieving loans" },
       { status: 500 },
     );
   }

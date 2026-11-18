@@ -156,21 +156,21 @@ export const transactions = pgTable(
 );
 
 // ==========================================
-// DEBT ENUM
+// LOAN ENUM
 // ==========================================
 
-export const debtTypeEnum = pgEnum("debt_type", ["borrowed", "lent"]);
+export const loanTypeEnum = pgEnum("loan_type", ["borrowed", "lent"]);
 
 // ==========================================
-// DEBTS TABLE
+// LOANS TABLE
 // ==========================================
 
-export const debts = pgTable(
-  "debts",
+export const loans = pgTable(
+  "loans",
   {
     id: uuid("id").defaultRandom().primaryKey(),
 
-    // Owner of this debt record
+    // Owner of this loan record
     userId: text("user_id")
       .notNull()
       .references(() => user.id, {
@@ -183,7 +183,7 @@ export const debts = pgTable(
     }).notNull(),
 
     // borrowed or lent
-    type: debtTypeEnum("type").notNull(),
+    type: loanTypeEnum("type").notNull(),
 
     // Original loan amount
     amount: numeric("amount", {
@@ -214,24 +214,24 @@ export const debts = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("debts_user_id_idx").on(table.userId),
-    index("debts_user_due_date_idx").on(table.userId, table.dueDate),
+    index("loans_user_id_idx").on(table.userId),
+    index("loans_user_due_date_idx").on(table.userId, table.dueDate),
   ],
 );
 
 // ==========================================
-// DEBT PAYMENTS TABLE
+// LOAN PAYMENTS TABLE
 // ==========================================
 
-export const debtPayments = pgTable(
-  "debt_payments",
+export const loanPayments = pgTable(
+  "loan_payments",
   {
     id: uuid("id").defaultRandom().primaryKey(),
 
-    // Which debt does this payment belong to?
-    debtId: uuid("debt_id")
+    // Which loan does this payment belong to?
+    loanId: uuid("loan_id")
       .notNull()
-      .references(() => debts.id, {
+      .references(() => loans.id, {
         onDelete: "cascade",
       }),
 
@@ -249,13 +249,13 @@ export const debtPayments = pgTable(
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("debt_payments_debt_id_idx").on(table.debtId)],
+  (table) => [index("loan_payments_loan_id_idx").on(table.loanId)],
 );
 
-export type DebtRecord = typeof debts.$inferSelect;
+export type LoanRecord = typeof loans.$inferSelect;
 
-export type NewDebtRecord = typeof debts.$inferInsert;
+export type NewLoanRecord = typeof loans.$inferInsert;
 
-export type DebtPaymentRecord = typeof debtPayments.$inferSelect;
+export type LoanPaymentRecord = typeof loanPayments.$inferSelect;
 
-export type NewDebtPaymentRecord = typeof debtPayments.$inferInsert;
+export type NewLoanPaymentRecord = typeof loanPayments.$inferInsert;

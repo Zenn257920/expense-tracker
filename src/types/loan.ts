@@ -1,24 +1,24 @@
-export type DebtType = "borrowed" | "lent";
+export type LoanType = "borrowed" | "lent";
 
-export type DebtStatus = "active" | "partially_paid" | "paid" | "overdue";
+export type LoanStatus = "active" | "partially_paid" | "paid" | "overdue";
 
-export interface Debt {
+export interface Loan {
   id: string;
   personName: string;
-  type: DebtType;
+  type: LoanType;
   amount: number;
   paidAmount: number;
   remainingAmount: number;
   borrowedDate: string;
   dueDate: string;
-  status: DebtStatus;
+  status: LoanStatus;
   description?: string;
   interestRate: number;
 }
 
-export interface CreateDebtInput {
+export interface CreateLoanInput {
   personName: string;
-  type: DebtType;
+  type: LoanType;
   amount: number;
   borrowedDate: string;
   dueDate: string;

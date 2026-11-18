@@ -6,21 +6,21 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/lib/format";
-import type { DebtOverview } from "@/lib/debt-analytics";
+import { formatMoneySuffix } from "@/lib/format";
+import type { LoanOverview } from "@/lib/loan-analytics";
 
-interface DebtSummaryProps {
-  overview: DebtOverview;
+interface LoanSummaryProps {
+  overview: LoanOverview;
   isLoading: boolean;
   hasError: boolean;
 }
 
-export default function DebtSummary({ overview, isLoading, hasError }: DebtSummaryProps) {
+export default function LoanSummary({ overview, isLoading, hasError }: LoanSummaryProps) {
   const cards = [
     { title: "Total Borrowed", amount: overview.borrowedTotal, icon: ArrowDownLeft, color: "text-red-500" },
     { title: "Total Lent", amount: overview.lentTotal, icon: ArrowUpRight, color: "text-green-500" },
     { title: "Upcoming Payments", amount: overview.upcomingTotal, icon: CalendarClock, color: "text-blue-500" },
-    { title: "Overdue Debts", amount: overview.overdueTotal, icon: AlertCircle, color: "text-orange-500" },
+    { title: "Overdue Loans", amount: overview.overdueTotal, icon: AlertCircle, color: "text-orange-500" },
   ];
 
   return (
@@ -33,7 +33,7 @@ export default function DebtSummary({ overview, isLoading, hasError }: DebtSumma
           </CardHeader>
           <CardContent>
             <p className="break-words text-2xl font-bold tabular-nums">
-              {isLoading ? "Loading..." : hasError ? "Unavailable" : formatMoney(card.amount)}
+              {isLoading ? "Loading..." : hasError ? "Unavailable" : formatMoneySuffix(card.amount)}
             </p>
           </CardContent>
         </Card>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { CreateDebtInput, DebtType } from "@/types/debt";
+import type { CreateLoanInput, LoanType } from "@/types/loan";
 
 import {
   Dialog,
@@ -19,15 +19,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 
-interface AddDebtDialogProps {
-  onAdd: (data: CreateDebtInput) => Promise<void>;
+interface AddLoanDialogProps {
+  onAdd: (data: CreateLoanInput) => Promise<void>;
 }
 
-export default function AddDebtDialog({ onAdd }: AddDebtDialogProps) {
+export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [formData, setFormData] = useState<CreateDebtInput>({
+  const [formData, setFormData] = useState<CreateLoanInput>({
     personName: "",
     type: "borrowed",
     amount: 0,
@@ -74,14 +74,14 @@ export default function AddDebtDialog({ onAdd }: AddDebtDialogProps) {
         render={
           <Button type="button" variant="outline">
             <Plus className="mr-2 size-4" />
-            Add Debt
+            Add Loan
           </Button>
         }
       />
 
       <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-xl">
         <DialogHeader className="gap-1">
-          <DialogTitle>Add New Debt</DialogTitle>
+          <DialogTitle>Add New Loan</DialogTitle>
           <DialogDescription>
             Record money you borrowed or lent to someone.
           </DialogDescription>
@@ -91,16 +91,16 @@ export default function AddDebtDialog({ onAdd }: AddDebtDialogProps) {
           onSubmit={handleSubmit}
           className="grid grid-cols-2 gap-x-3 gap-y-3"
         >
-          {/* Debt Type */}
+          {/* Loan Type */}
           <div className="col-span-2 space-y-1 sm:col-span-1">
-            <Label>Debt Type</Label>
+            <Label>Loan Type</Label>
 
             <select
               value={formData.type}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  type: e.target.value as DebtType,
+                  type: e.target.value as LoanType,
                 })
               }
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -242,7 +242,7 @@ export default function AddDebtDialog({ onAdd }: AddDebtDialogProps) {
             disabled={isSaving}
             variant="outline"
           >
-            {isSaving ? "Saving..." : "Save Debt"}
+            {isSaving ? "Saving..." : "Save Loan"}
           </Button>
         </form>
       </DialogContent>

@@ -7,7 +7,6 @@ import {
   ArrowLeftRight,
   LayoutDashboard,
   LogOut,
-  Plus,
   Settings,
   Tags,
   Wallet,
@@ -41,13 +40,12 @@ import {
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { Button } from "../ui/button";
 
 const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
   { label: "Categories", href: "/categories", icon: Tags },
-  { label: "Debits", href: "/debts", icon: Handshake },
+  { label: "Loans", href: "/loans", icon: Handshake },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -83,7 +81,10 @@ export default function AppSidebar() {
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader className="h-20 justify-center px-5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
-        <Link href="/dashboard" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center"
+        >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-700 text-white">
             <Wallet aria-hidden="true" />
           </span>
@@ -123,7 +124,9 @@ export default function AppSidebar() {
                       }}
                     >
                       <Icon />
-                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                      <span className="group-data-[collapsible=icon]:hidden">
+                        {item.label}
+                      </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -143,7 +146,9 @@ export default function AppSidebar() {
               className="text-muted-foreground"
             >
               <LogOut />
-              <span className="group-data-[collapsible=icon]:hidden">Sign out</span>
+              <span className="group-data-[collapsible=icon]:hidden">
+                Sign out
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -192,7 +197,7 @@ export function DashboardHeader() {
         <div className="h-5 w-px bg-border" />
         <h1 className="text-sm font-medium text-foreground">{title}</h1>
       </div>
-      <div>
+      {/* <div>
         <Button
           variant="outline"
           nativeButton={false}
@@ -201,7 +206,7 @@ export function DashboardHeader() {
           <Plus data-icon="inline-start" />
           Add Transaction
         </Button>
-      </div>
+      </div> */}
     </header>
   );
 }

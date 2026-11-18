@@ -13,7 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 This repository is a Next.js App Router expense and finance tracker. Application code lives in `src/` and uses the `@/*` import alias for paths under `src/`.
 
 - `src/app/` contains route segments and layouts. Route groups `(auth)` and `(dashboard)` organize pages without changing their URLs. API endpoints live under `src/app/api/` as Route Handlers.
-- `src/components/` contains feature components grouped by area (`auth`, `dashboard`, `debits`, `transactions`, and `layout`). Shared UI primitives live in `src/components/ui/`.
+- `src/components/` contains feature components grouped by area (`auth`, `dashboard`, `loans`, `transactions`, and `layout`). Shared UI primitives live in `src/components/ui/`.
 - `src/hooks/` contains reusable client hooks, such as `useCategories`.
 - `src/lib/` contains shared utilities, authentication helpers, and API access. Client API calls use the Axios instance in `src/lib/api-client.ts` and typed feature methods in `src/lib/api.ts`. Reuse these instead of adding another HTTP client or fetching library. Server-side database operations may use feature services in `src/lib/services/`.
 - `src/types/` contains shared TypeScript data types.

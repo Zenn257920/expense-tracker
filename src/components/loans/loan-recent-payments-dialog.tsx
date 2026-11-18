@@ -6,20 +6,20 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatMoney } from "@/lib/format";
-import type { RecentDebtPayment } from "@/lib/api";
+import { formatDate, formatMoneySuffix } from "@/lib/format";
+import type { RecentLoanPayment } from "@/lib/api";
 
-interface RecentPaymentsDialogProps {
-  payments: RecentDebtPayment[];
+interface LoanRecentPaymentsDialogProps {
+  payments: RecentLoanPayment[];
   isLoading: boolean;
   error: string | null;
 }
 
-export default function RecentPaymentsDialog({
+export default function LoanRecentPaymentsDialog({
   payments,
   isLoading,
   error,
-}: RecentPaymentsDialogProps) {
+}: LoanRecentPaymentsDialogProps) {
   return (
     <Dialog>
       <DialogTrigger
@@ -33,7 +33,7 @@ export default function RecentPaymentsDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] min-w-0 overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Recent Payments</DialogTitle>
-          <DialogDescription>The latest 5 payments across your debts.</DialogDescription>
+          <DialogDescription>The latest 5 payments across your loans.</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -67,7 +67,7 @@ export default function RecentPaymentsDialog({
                 </div>
                 <div className="flex min-w-0 items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
                   <span className="text-sm text-muted-foreground">{formatDate(payment.paymentDate)}</span>
-                  <span className="font-medium tabular-nums">{formatMoney(payment.amount)}</span>
+                  <span className="font-medium tabular-nums">{formatMoneySuffix(payment.amount)}</span>
                 </div>
               </li>
             ))}
