@@ -22,11 +22,17 @@ interface MonthlyOverviewProps {
 }
 
 type ChartPeriod = "current-month" | "last-six-months";
+interface ChartPoint {
+  date?: string;
+  month?: string;
+  income?: number;
+  expenses: number;
+}
 
 export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyOverviewProps) {
   const [period, setPeriod] = useState<ChartPeriod>("current-month");
   const isCurrentMonth = period === "current-month";
-  const chartData = isCurrentMonth
+  const chartData: ChartPoint[] = isCurrentMonth
     ? dailyExpenses.map((item) => ({ date: item.date, expenses: Number(item.expenses) }))
     : monthlyData.map((item) => ({
         month: item.month,
