@@ -14,11 +14,11 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { DailyExpensePoint } from "@/types/dashboard";
+import type { DailyTrendPoint } from "@/types/dashboard";
 
 interface MonthlyOverviewProps {
   monthlyData: MonthlyTrendPoint[];
-  dailyExpenses: DailyExpensePoint[];
+  dailyTrend: DailyTrendPoint[];
 }
 
 type ChartPeriod = "current-month" | "last-six-months";
@@ -29,11 +29,15 @@ interface ChartPoint {
   expenses: number;
 }
 
-export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyOverviewProps) {
+export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOverviewProps) {
   const [period, setPeriod] = useState<ChartPeriod>("current-month");
   const isCurrentMonth = period === "current-month";
   const chartData: ChartPoint[] = isCurrentMonth
-    ? dailyExpenses.map((item) => ({ date: item.date, expenses: Number(item.expenses) }))
+    ? dailyTrend.map((item) => ({
+        date: item.date,
+        income: Number(item.income),
+        expenses: Number(item.expenses),
+      }))
     : monthlyData.map((item) => ({
         month: item.month,
         income: Number(item.income),
@@ -41,7 +45,7 @@ export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyO
       }));
 
   const chartConfig = {
-    ...(isCurrentMonth ? {} : { income: { label: "Income", color: "#10b981" } }),
+    income: { label: "Income", color: "#10b981" },
     expenses: { label: "Expenses", color: "#f43f5e" },
   } satisfies ChartConfig;
 
@@ -49,9 +53,9 @@ export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyO
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1.5">
-          <CardTitle>{isCurrentMonth ? "Daily Expenses" : "Income vs. Expenses"}</CardTitle>
+          <CardTitle>{isCurrentMonth ? "Daily Income vs. Expenses" : "Income vs. Expenses"}</CardTitle>
           <CardDescription>
-            {isCurrentMonth ? "Expenses by day for the current month" : "Monthly cash flow of the last six months"}
+            {isCurrentMonth ? "Income and expenses by day for the current month" : "Monthly cash flow of the last six months"}
           </CardDescription>
         </div>
         <Tabs value={period} onValueChange={(value) => value && setPeriod(value as ChartPeriod)}>
@@ -82,7 +86,7 @@ export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyO
             <XAxis
               dataKey={isCurrentMonth ? "date" : "month"}
               tickFormatter={isCurrentMonth ? (value: string) => formatDate(value) : undefined}
-              interval={isCurrentMonth ? Math.max(0, Math.ceil(dailyExpenses.length / 7) - 1) : 0}
+              interval={isCurrentMonth ? Math.max(0, Math.ceil(dailyTrend.length / 7) - 1) : 0}
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a1a1aa", fontSize: 12 }}
@@ -107,17 +111,15 @@ export default function MonthlyOverview({ monthlyData, dailyExpenses }: MonthlyO
               height={36}
               content={<ChartLegendContent verticalAlign="top" />}
             />
-            {!isCurrentMonth && (
-              <Area
-                type="monotone"
-                dataKey="income"
-                name="Income"
-                stroke="#10b981"
-                strokeWidth={2}
-                fill="url(#incomeGradient)"
-                fillOpacity={1}
-              />
-            )}
+            <Area
+              type="monotone"
+              dataKey="income"
+              name="Income"
+              stroke="#10b981"
+              strokeWidth={2}
+              fill="url(#incomeGradient)"
+              fillOpacity={1}
+            />
             <Area
               type="monotone"
               dataKey="expenses"

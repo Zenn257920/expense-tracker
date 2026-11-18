@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
         <MonthlyOverview
           monthlyData={summary.monthlyTrend}
-          dailyExpenses={summary.dailyExpenses}
+          dailyTrend={summary.dailyTrend}
         />
       </div>
     </div>

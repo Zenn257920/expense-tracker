@@ -15,7 +15,7 @@ export interface DashboardSummary {
   totalExpenses: string;
   balance: string;
   monthlyTrend: MonthlyTrendPoint[];
-  dailyExpenses: DailyExpensePoint[];
+  dailyTrend: DailyTrendPoint[];
 }
 
 export interface MonthlyTrendPoint {
@@ -24,8 +24,9 @@ export interface MonthlyTrendPoint {
   expenses: string;
 }
 
-export interface DailyExpensePoint {
+export interface DailyTrendPoint {
   date: string;
+  income: string;
   expenses: string;
 }
 
