@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { DebtOverview } from "@/lib/debt-analytics";
 
@@ -37,7 +38,12 @@ export default function DebtDashboardOverview({
                 {overview.upcomingDebts.map((debt) => (
                   <li key={debt.id} className="flex min-w-0 flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{debt.personName}</p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate font-medium">{debt.personName}</p>
+                        <Badge variant={debt.type === "lent" ? "secondary" : "outline"}>
+                          {debt.type === "lent" ? "Lent" : "Borrowed"}
+                        </Badge>
+                      </div>
                       <p className="text-xs text-muted-foreground">Due {formatDate(debt.dueDate)}</p>
                     </div>
                     <p className="shrink-0 text-right text-sm font-medium tabular-nums">{formatMoney(debt.remainingAmount)}</p>

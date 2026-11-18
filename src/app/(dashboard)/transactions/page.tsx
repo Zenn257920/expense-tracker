@@ -99,7 +99,6 @@ export default function TransactionsPage() {
             value={typeFilter}
             onValueChange={(value) => {
               if (value && value !== typeFilter) {
-                setIsLoading(true);
                 setError(null);
                 setTypeFilter(value as TransactionTypeFilter);
                 setPage(1);

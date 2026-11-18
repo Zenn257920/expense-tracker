@@ -4,15 +4,54 @@ import { useState, type FormEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import Input from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatAmount } from "@/lib/format";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
@@ -46,8 +85,15 @@ export default function RecentTransactions({
   onTransactionChanged,
 }: RecentTransactionsProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<EditFormData>({ description: "", amount: "", categoryId: "", transactionDate: "" });
-  const [deleteTarget, setDeleteTarget] = useState<RecentTransaction | null>(null);
+  const [editForm, setEditForm] = useState<EditFormData>({
+    description: "",
+    amount: "",
+    categoryId: "",
+    transactionDate: "",
+  });
+  const [deleteTarget, setDeleteTarget] = useState<RecentTransaction | null>(
+    null,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,7 +113,10 @@ export default function RecentTransactions({
     if (!editingId) return;
     const numericAmount = Number(editForm.amount);
     if (!editForm.categoryId) return setError("Please select a category.");
-    if (!isValidAmount(numericAmount)) return setError("Enter a positive amount with no more than two decimal places.");
+    if (!isValidAmount(numericAmount))
+      return setError(
+        "Enter a positive amount with no more than two decimal places.",
+      );
 
     setIsSaving(true);
     setError("");
@@ -104,7 +153,10 @@ export default function RecentTransactions({
     }
   }
 
-  const categoryItems = categories.map((category) => ({ label: `${category.name} (${category.type})`, value: category.id }));
+  const categoryItems = categories.map((category) => ({
+    label: `${category.name} (${category.type})`,
+    value: category.id,
+  }));
 
   return (
     <Card>
@@ -115,7 +167,14 @@ export default function RecentTransactions({
       <CardContent>
         {error && <FieldError className="mb-4">{error}</FieldError>}
         {transactions.length === 0 ? (
-          <Empty className="border"><EmptyHeader><EmptyTitle>No transactions found</EmptyTitle><EmptyDescription>Try another search or add your first transaction.</EmptyDescription></EmptyHeader></Empty>
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyTitle>No transactions found</EmptyTitle>
+              <EmptyDescription>
+                Try another search or add your first transaction.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <Table>
             <TableHeader>
@@ -124,7 +183,9 @@ export default function RecentTransactions({
                 <TableHead>Category</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
-                <TableHead><span className="sr-only">Actions</span></TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -132,33 +193,169 @@ export default function RecentTransactions({
                 <TableRow key={transaction.id}>
                   {editingId === transaction.id ? (
                     <TableCell colSpan={5} className="whitespace-normal">
-                      <form onSubmit={handleUpdate} className="flex flex-col gap-4">
+                      <form
+                        onSubmit={handleUpdate}
+                        className="flex flex-col gap-4"
+                      >
                         <FieldGroup className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                          <Field><FieldLabel htmlFor={`edit-description-${transaction.id}`}>Description</FieldLabel><Input id={`edit-description-${transaction.id}`} value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} maxLength={500} required /></Field>
-                          <Field><FieldLabel htmlFor={`edit-category-${transaction.id}`}>Category</FieldLabel><Select items={categoryItems} value={editForm.categoryId || null} onValueChange={(value) => setEditForm({ ...editForm, categoryId: value ?? "" })}><SelectTrigger id={`edit-category-${transaction.id}`} className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{categoryItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
-                          <Field><FieldLabel htmlFor={`edit-amount-${transaction.id}`}>Amount (MMK)</FieldLabel><Input id={`edit-amount-${transaction.id}`} type="number" min="0.01" step="0.01" value={editForm.amount} onChange={(event) => setEditForm({ ...editForm, amount: event.target.value })} required /></Field>
-                          <Field><FieldLabel htmlFor={`edit-date-${transaction.id}`}>Date</FieldLabel><Input id={`edit-date-${transaction.id}`} type="date" value={editForm.transactionDate} onChange={(event) => setEditForm({ ...editForm, transactionDate: event.target.value })} required /></Field>
+                          <Field>
+                            <FieldLabel
+                              htmlFor={`edit-description-${transaction.id}`}
+                            >
+                              Description
+                            </FieldLabel>
+                            <Input
+                              id={`edit-description-${transaction.id}`}
+                              value={editForm.description}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  description: event.target.value,
+                                })
+                              }
+                              maxLength={500}
+                              required
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel
+                              htmlFor={`edit-category-${transaction.id}`}
+                            >
+                              Category
+                            </FieldLabel>
+                            <Select
+                              items={categoryItems}
+                              value={editForm.categoryId || null}
+                              onValueChange={(value) =>
+                                setEditForm({
+                                  ...editForm,
+                                  categoryId: value ?? "",
+                                })
+                              }
+                            >
+                              <SelectTrigger
+                                id={`edit-category-${transaction.id}`}
+                                className="w-full"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {categoryItems.map((item) => (
+                                    <SelectItem
+                                      key={item.value}
+                                      value={item.value}
+                                    >
+                                      {item.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                          <Field>
+                            <FieldLabel
+                              htmlFor={`edit-amount-${transaction.id}`}
+                            >
+                              Amount (MMK)
+                            </FieldLabel>
+                            <Input
+                              id={`edit-amount-${transaction.id}`}
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={editForm.amount}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  amount: event.target.value,
+                                })
+                              }
+                              required
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel htmlFor={`edit-date-${transaction.id}`}>
+                              Date
+                            </FieldLabel>
+                            <Input
+                              id={`edit-date-${transaction.id}`}
+                              type="date"
+                              value={editForm.transactionDate}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  transactionDate: event.target.value,
+                                })
+                              }
+                              required
+                            />
+                          </Field>
                         </FieldGroup>
                         <div className="flex gap-2">
-                          <Button type="submit" disabled={isSaving}>Save changes</Button>
-                          <Button type="button" variant="outline" disabled={isSaving} onClick={() => setEditingId(null)}>Cancel</Button>
+                          <Button
+                            type="submit"
+                            disabled={isSaving}
+                            variant="outline"
+                          >
+                            Save changes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isSaving}
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </Button>
                         </div>
                       </form>
                     </TableCell>
                   ) : (
                     <>
-                      <TableCell className="max-w-56 truncate font-medium">{transaction.description}</TableCell>
-                      <TableCell><Badge variant="outline">{transaction.categoryName}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(transaction.transactionDate)}</TableCell>
+                      <TableCell className="max-w-56 truncate font-medium">
+                        {transaction.description}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {transaction.categoryName}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(transaction.transactionDate)}
+                      </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
-                        <span className={transaction.type === "income" ? "text-primary" : "text-foreground"}>
-                          {transaction.type === "income" ? "+ " : "- "}{formatAmount(transaction.amount)} MMK
+                        <span
+                          className={
+                            transaction.type === "income"
+                              ? "text-primary"
+                              : "text-foreground"
+                          }
+                        >
+                          {transaction.type === "income" ? "+ " : "- "}
+                          {formatAmount(transaction.amount)} MMK
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" size="icon-sm" aria-label="Edit transaction" onClick={() => handleEdit(transaction)}><Pencil data-icon="inline-start" /></Button>
-                          <Button type="button" variant="destructive" size="icon-sm" aria-label="Delete transaction" onClick={() => setDeleteTarget(transaction)}><Trash2 data-icon="inline-start" /></Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label="Edit transaction"
+                            onClick={() => handleEdit(transaction)}
+                          >
+                            <Pencil data-icon="inline-start" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon-sm"
+                            aria-label="Delete transaction"
+                            onClick={() => setDeleteTarget(transaction)}
+                          >
+                            <Trash2 data-icon="inline-start" />
+                          </Button>
                         </div>
                       </TableCell>
                     </>
@@ -170,15 +367,29 @@ export default function RecentTransactions({
         )}
       </CardContent>
 
-      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone{deleteTarget ? `. “${deleteTarget.description}” will be removed.` : "."}</AlertDialogDescription>
+            <AlertDialogDescription>
+              This action cannot be undone
+              {deleteTarget
+                ? `. “${deleteTarget.description}” will be removed.`
+                : "."}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={isSaving}>{isSaving ? "Deleting..." : "Delete transaction"}</AlertDialogAction>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isSaving}
+            >
+              {isSaving ? "Deleting..." : "Delete transaction"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
