@@ -16,3 +16,11 @@ export function formatMoney(value: string | number) {
 export function formatAmount(value: string | number) {
   return amountFormatter.format(Number(value));
 }
+
+export function formatDate(value: string) {
+  const date = value.slice(0, 10);
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
+}

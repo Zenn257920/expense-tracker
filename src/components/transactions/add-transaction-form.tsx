@@ -105,6 +105,12 @@ export default function AddTransactionForm({
         transactionDate,
       });
 
+      setType("expense");
+      setCategoryId("");
+      setDescription("");
+      setAmount("");
+      setTransactionDate("");
+      setError("");
       toast.success("Transaction added successfully.");
       await onTransactionAdded();
     } catch (err) {

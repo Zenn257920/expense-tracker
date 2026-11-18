@@ -11,6 +11,7 @@ import {
   Settings,
   Tags,
   Wallet,
+  Handshake,
 } from "lucide-react";
 
 import {
@@ -46,6 +47,7 @@ const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
   { label: "Categories", href: "/categories", icon: Tags },
+  { label: "Debits", href: "/debts", icon: Handshake },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -80,8 +82,8 @@ export default function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="inset">
-      <SidebarHeader className="h-20 justify-center px-5">
-        <Link href="/dashboard" className="flex items-center gap-3">
+      <SidebarHeader className="h-20 justify-center px-5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
+        <Link href="/dashboard" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-700 text-white">
             <Wallet aria-hidden="true" />
           </span>
@@ -99,7 +101,7 @@ export default function AppSidebar() {
       <SidebarSeparator />
 
       <SidebarContent>
-        <SidebarGroup className="px-3 py-4">
+        <SidebarGroup className="px-3 py-4 group-data-[collapsible=icon]:px-2">
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -121,7 +123,7 @@ export default function AppSidebar() {
                       }}
                     >
                       <Icon />
-                      <span>{item.label}</span>
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -131,7 +133,7 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
+      <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:px-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -141,7 +143,7 @@ export default function AppSidebar() {
               className="text-muted-foreground"
             >
               <LogOut />
-              <span>Sign out</span>
+              <span className="group-data-[collapsible=icon]:hidden">Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -191,7 +193,11 @@ export function DashboardHeader() {
         <h1 className="text-sm font-medium text-foreground">{title}</h1>
       </div>
       <div>
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/transactions/new" />}
+        >
           <Plus data-icon="inline-start" />
           Add Transaction
         </Button>

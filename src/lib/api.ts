@@ -5,6 +5,7 @@ import type {
   RecentTransaction,
   TransactionType,
 } from "@/types/dashboard";
+import type { CreateDebtInput, Debt, DebtStatus, DebtType } from "@/types/debt";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -41,10 +42,56 @@ export interface TransactionListResponse {
   };
 }
 
+interface DebtApiRecord {
+  id: string;
+  personName: string;
+  type: DebtType;
+  amount: number | string;
+  paidAmount: number | string;
+  remainingAmount: number | string;
+  startDate: string;
+  dueDate: string;
+  interestRate: number | string;
+  status: DebtStatus;
+  description: string | null;
+}
+
+export interface RecentDebtPayment {
+  id: string;
+  personName: string;
+  type: DebtType;
+  amount: number;
+  paymentDate: string;
+  note: string | null;
+}
+
+interface DebtListResponse {
+  message: string;
+  data: DebtApiRecord[];
+  recentPayments: RecentDebtPayment[];
+}
+
+function mapDebt(record: DebtApiRecord): Debt {
+  return {
+    id: record.id,
+    personName: record.personName,
+    type: record.type,
+    amount: Number(record.amount),
+    paidAmount: Number(record.paidAmount),
+    remainingAmount: Number(record.remainingAmount),
+    borrowedDate: record.startDate,
+    dueDate: record.dueDate,
+    interestRate: Number(record.interestRate),
+    status: record.status,
+    description: record.description ?? undefined,
+  };
+}
+
 export interface TransactionFilters {
   page: number;
   limit: number;
   search: string;
+  type?: TransactionType | "all";
 }
 
 export interface CategoryInput {
@@ -61,7 +108,95 @@ export interface TransactionInput {
 
 export type TransactionUpdateInput = Partial<TransactionInput>;
 
+export interface DebtUpdateInput {
+  personName?: string;
+  type?: DebtType;
+  amount?: number;
+  interestRate?: number;
+  startDate?: string;
+  dueDate?: string;
+  description?: string | null;
+}
+
+export interface DebtPaymentInput {
+  amount: number;
+  paymentDate: string;
+  note?: string;
+}
+
+export interface DebtPaymentRecord {
+  id: string;
+  amount: number;
+  paymentDate: string;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface DebtPaymentHistory {
+  payments: DebtPaymentRecord[];
+  debt: {
+    id: string;
+    originalAmount: number;
+    paidAmount: number;
+    remainingAmount: number;
+    paymentCount: number;
+    status: DebtStatus;
+  };
+}
+
 export const api = {
+  async getDebts() {
+    return getOnce("GET /debts", async () => {
+      const response = await apiClient.get<DebtListResponse>("/debts");
+      return {
+        debts: response.data.data.map(mapDebt),
+        recentPayments: response.data.recentPayments,
+      };
+    });
+  },
+
+  async createDebt(input: CreateDebtInput) {
+    await apiClient.post<{ message: string; data: unknown }>("/debts", input);
+  },
+
+  async updateDebt(id: string, input: DebtUpdateInput) {
+    await apiClient.patch<ApiResponse<unknown>>(`/debts/${id}`, input);
+  },
+
+  async deleteDebt(id: string) {
+    await apiClient.delete(`/debts/${id}`);
+  },
+
+  async createDebtPayment(id: string, input: DebtPaymentInput) {
+    const response = await apiClient.post<ApiResponse<{
+      payment: { id: string; debtId: string; amount: number; paymentDate: string; note: string | null; createdAt: string };
+      debt: { id: string; paidAmount: number; remainingAmount: number; status: DebtStatus };
+    }>>(`/debts/${id}/payments`, input);
+    return response.data.data;
+  },
+
+  async getDebtPayments(id: string) {
+    const response = await apiClient.get<ApiResponse<DebtPaymentHistory>>(
+      `/debts/${id}/payments`,
+    );
+    return response.data.data;
+  },
+
+  async updateDebtPayment(
+    debtId: string,
+    paymentId: string,
+    input: Partial<DebtPaymentInput>,
+  ) {
+    await apiClient.patch<ApiResponse<unknown>>(
+      `/debts/${debtId}/payments/${paymentId}`,
+      input,
+    );
+  },
+
+  async deleteDebtPayment(debtId: string, paymentId: string) {
+    await apiClient.delete(`/debts/${debtId}/payments/${paymentId}`);
+  },
+
   async getCategories() {
     return getOnce("GET /categories", async () => {
       const response =

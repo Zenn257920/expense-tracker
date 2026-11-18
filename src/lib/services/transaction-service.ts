@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { ApiError } from "@/lib/api-error";
 import { isValidAmount, isValidDate } from "@/lib/validation";
+import type { TransactionType } from "@/types/dashboard";
 
 type TransactionInput = {
   categoryId?: unknown;
@@ -14,6 +15,7 @@ type TransactionInput = {
 
 export interface TransactionFilters {
   categoryId?: string | null;
+  type?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   search?: string;
@@ -45,7 +47,7 @@ function validateTransaction(input: TransactionInput) {
 }
 
 export async function listTransactions(userId: string, options: TransactionFilters = {}) {
-  const { categoryId, startDate, endDate, search = "" } = options;
+  const { categoryId, type, startDate, endDate, search = "" } = options;
   const page = Math.max(1, Number.parseInt(options.page ?? "1", 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(options.limit ?? "10", 10) || 10));
 
@@ -53,9 +55,13 @@ export async function listTransactions(userId: string, options: TransactionFilte
       (startDate && endDate && startDate > endDate)) {
     throw new ApiError("Invalid date range", 400);
   }
+  if (type && type !== "all" && type !== "income" && type !== "expense") {
+    throw new ApiError("Invalid transaction type", 400);
+  }
 
   const filters = [eq(transactions.userId, userId)];
   if (categoryId) filters.push(eq(transactions.categoryId, categoryId));
+  if (type && type !== "all") filters.push(eq(categories.type, type as TransactionType));
   if (startDate) filters.push(gte(transactions.transactionDate, startDate));
   if (endDate) filters.push(lte(transactions.transactionDate, endDate));
 

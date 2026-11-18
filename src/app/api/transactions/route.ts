@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const result = await listTransactions(session.user.id, {
       categoryId: params.get("categoryId"),
+      type: params.get("type"),
       startDate: params.get("startDate"),
       endDate: params.get("endDate"),
       search: params.get("search") ?? "",

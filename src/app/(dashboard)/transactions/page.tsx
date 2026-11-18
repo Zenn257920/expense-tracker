@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import RecentTransactions from "@/components/transactions/recent-transactions";
 import SearchBar from "@/components/ui/search-bar";
 import type { RecentTransaction } from "@/types/dashboard";
@@ -12,8 +12,12 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import TransactionsSkeleton from "@/components/transactions/transactions-skeleton";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { TransactionType } from "@/types/dashboard";
+import { TablePagination } from "@/components/ui/table-pagination";
 
-const LIMIT = 10;
+const LIMIT = 5;
+type TransactionTypeFilter = "all" | TransactionType;
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
@@ -22,6 +26,7 @@ export default function TransactionsPage() {
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalTransactions, setTotalTransactions] = useState(0);
@@ -37,6 +42,7 @@ export default function TransactionsPage() {
           page,
           limit: LIMIT,
           search,
+          type: typeFilter,
         });
 
         if (isActive) {
@@ -59,7 +65,7 @@ export default function TransactionsPage() {
     return () => {
       isActive = false;
     };
-  }, [page, refreshKey, search]);
+  }, [page, refreshKey, search, typeFilter]);
 
   const refreshTransactions = useCallback(() => {
     setIsLoading(true);
@@ -88,29 +94,48 @@ export default function TransactionsPage() {
           </Button>
         </div>
 
-        <SearchBar
-          value={searchInput}
-          placeholder="Search transactions..."
-          hasSearch={Boolean(search)}
-          onChange={setSearchInput}
-          onSearch={(query) => {
-            if (query !== search || page !== 1) {
-              setIsLoading(true);
-              setError(null);
-            }
-            setSearch(query);
-            setPage(1);
-          }}
-          onReset={() => {
-            setSearchInput("");
-            if (search || page !== 1) {
-              setIsLoading(true);
-              setError(null);
-            }
-            setSearch("");
-            setPage(1);
-          }}
-        />
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs
+            value={typeFilter}
+            onValueChange={(value) => {
+              if (value && value !== typeFilter) {
+                setIsLoading(true);
+                setError(null);
+                setTypeFilter(value as TransactionTypeFilter);
+                setPage(1);
+              }
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="expense">Expense</TabsTrigger>
+              <TabsTrigger value="income">Income</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <SearchBar
+            value={searchInput}
+            placeholder="Search transactions..."
+            hasSearch={Boolean(search)}
+            onChange={setSearchInput}
+            onSearch={(query) => {
+              if (query !== search || page !== 1) {
+                setIsLoading(true);
+                setError(null);
+              }
+              setSearch(query);
+              setPage(1);
+            }}
+            onReset={() => {
+              setSearchInput("");
+              if (search || page !== 1) {
+                setIsLoading(true);
+                setError(null);
+              }
+              setSearch("");
+              setPage(1);
+            }}
+          />
+        </div>
 
         {error && (
           <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -141,39 +166,17 @@ export default function TransactionsPage() {
         )}
 
         {!isLoading && !error && totalTransactions > 0 && (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Page {page} of {totalPages}
-            </p>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={page === 1}
-                onClick={() => {
-                  setIsLoading(true);
-                  setPage((prev) => prev - 1);
-                }}
-                aria-label="Previous page"
-              >
-                <ChevronLeft data-icon="inline-start" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={page >= totalPages}
-                onClick={() => {
-                  setIsLoading(true);
-                  setPage((prev) => prev + 1);
-                }}
-                aria-label="Next page"
-              >
-                <ChevronRight data-icon="inline-start" />
-              </Button>
-            </div>
-          </div>
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalTransactions}
+            pageSize={LIMIT}
+            itemLabel="transactions"
+            onPageChange={(nextPage) => {
+              setIsLoading(true);
+              setPage(nextPage);
+            }}
+          />
         )}
       </div>
     </div>

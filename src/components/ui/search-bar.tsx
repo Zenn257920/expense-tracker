@@ -2,7 +2,12 @@
 
 import { RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 interface SearchBarProps {
   value: string;

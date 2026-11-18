@@ -55,12 +55,14 @@ import {
 } from "@/components/ui/select";
 import type { Category } from "@/types/dashboard";
 import { Spinner } from "@/components/ui/spinner";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 type CategoryType = Category["type"];
 const typeItems = [
   { label: "Expense", value: "expense" },
   { label: "Income", value: "income" },
 ];
+const CATEGORY_PAGE_SIZE = 5;
 
 export default function CategoriesPage() {
   const {
@@ -77,6 +79,13 @@ export default function CategoriesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [categoryPage, setCategoryPage] = useState(1);
+  const categoryTotalPages = Math.ceil(categories.length / CATEGORY_PAGE_SIZE);
+  const currentCategoryPage = Math.min(categoryPage, Math.max(1, categoryTotalPages));
+  const paginatedCategories = categories.slice(
+    (currentCategoryPage - 1) * CATEGORY_PAGE_SIZE,
+    currentCategoryPage * CATEGORY_PAGE_SIZE,
+  );
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -237,7 +246,7 @@ export default function CategoriesPage() {
               </Empty>
             ) : (
               <ul className="flex flex-col gap-3">
-                {categories.map((category) => {
+                {paginatedCategories.map((category) => {
                   const Icon =
                     category.type === "income" ? ArrowUpRight : ArrowDownLeft;
                   const isIncome = category.type === "income";
@@ -356,6 +365,18 @@ export default function CategoriesPage() {
                   );
                 })}
               </ul>
+            )}
+            {!categoriesError && !isLoading && categories.length > 0 && (
+              <div className="mt-4">
+                <TablePagination
+                  page={currentCategoryPage}
+                  totalPages={categoryTotalPages}
+                  totalItems={categories.length}
+                  pageSize={CATEGORY_PAGE_SIZE}
+                  itemLabel="categories"
+                  onPageChange={setCategoryPage}
+                />
+              </div>
             )}
           </CardContent>
         </Card>
