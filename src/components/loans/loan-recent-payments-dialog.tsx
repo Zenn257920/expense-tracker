@@ -7,7 +7,7 @@ import { FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatMoneySuffix } from "@/lib/format";
-import type { RecentLoanPayment } from "@/lib/api";
+import type { RecentLoanPayment } from "@/types/api";
 
 interface LoanRecentPaymentsDialogProps {
   payments: RecentLoanPayment[];

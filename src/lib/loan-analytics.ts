@@ -9,11 +9,8 @@ export interface LoanOverview {
   overdueLoans: Loan[];
 }
 
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function utcDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
 }
 
 function remainingBalance(loan: Loan) {
@@ -21,9 +18,11 @@ function remainingBalance(loan: Loan) {
 }
 
 export function calculateLoanOverview(loans: Loan[], now = new Date()): LoanOverview {
-  const today = localDateKey(now);
-  const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
-  const nextWeekKey = localDateKey(nextWeek);
+  const today = utcDateKey(now);
+  const nextWeek = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 7),
+  );
+  const nextWeekKey = utcDateKey(nextWeek);
 
   const overdueLoans = loans
     .filter((loan) => remainingBalance(loan) > 0 && loan.dueDate.slice(0, 10) < today)

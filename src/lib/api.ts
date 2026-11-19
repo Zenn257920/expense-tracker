@@ -3,14 +3,21 @@ import type {
   Category,
   DashboardSummary,
   RecentTransaction,
-  TransactionType,
 } from "@/types/dashboard";
-import type { CreateLoanInput, Loan, LoanStatus, LoanType } from "@/types/loan";
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-}
+import type { CreateLoanInput, Loan, LoanStatus } from "@/types/loan";
+import type {
+  ApiResponse,
+  CategoryInput,
+  LoanApiRecord,
+  LoanPaymentHistory,
+  LoanPaymentInput,
+  LoanListResponse,
+  LoanUpdateInput,
+  TransactionFilters,
+  TransactionInput,
+  TransactionListResponse,
+  TransactionUpdateInput,
+} from "@/types/api";
 
 const pendingGetRequests = new Map<string, Promise<unknown>>();
 
@@ -31,46 +38,6 @@ function getOnce<T>(key: string, request: () => Promise<T>): Promise<T> {
   return newRequest;
 }
 
-export interface TransactionListResponse {
-  success: boolean;
-  data: RecentTransaction[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-interface LoanApiRecord {
-  id: string;
-  personName: string;
-  type: LoanType;
-  amount: number | string;
-  paidAmount: number | string;
-  remainingAmount: number | string;
-  startDate: string;
-  dueDate: string;
-  interestRate: number | string;
-  status: LoanStatus;
-  description: string | null;
-}
-
-export interface RecentLoanPayment {
-  id: string;
-  personName: string;
-  type: LoanType;
-  amount: number;
-  paymentDate: string;
-  note: string | null;
-}
-
-interface LoanListResponse {
-  message: string;
-  data: LoanApiRecord[];
-  recentPayments: RecentLoanPayment[];
-}
-
 function mapLoan(record: LoanApiRecord): Loan {
   return {
     id: record.id,
@@ -84,63 +51,6 @@ function mapLoan(record: LoanApiRecord): Loan {
     interestRate: Number(record.interestRate),
     status: record.status,
     description: record.description ?? undefined,
-  };
-}
-
-export interface TransactionFilters {
-  page: number;
-  limit: number;
-  search: string;
-  type?: TransactionType | "all";
-}
-
-export interface CategoryInput {
-  name: string;
-  type: TransactionType;
-}
-
-export interface TransactionInput {
-  categoryId: string;
-  description: string;
-  amount: number;
-  transactionDate: string;
-}
-
-export type TransactionUpdateInput = Partial<TransactionInput>;
-
-export interface LoanUpdateInput {
-  personName?: string;
-  type?: LoanType;
-  amount?: number;
-  interestRate?: number;
-  startDate?: string;
-  dueDate?: string;
-  description?: string | null;
-}
-
-export interface LoanPaymentInput {
-  amount: number;
-  paymentDate: string;
-  note?: string;
-}
-
-export interface LoanPaymentRecord {
-  id: string;
-  amount: number;
-  paymentDate: string;
-  note: string | null;
-  createdAt: string;
-}
-
-export interface LoanPaymentHistory {
-  payments: LoanPaymentRecord[];
-  loan: {
-    id: string;
-    originalAmount: number;
-    paidAmount: number;
-    remainingAmount: number;
-    paymentCount: number;
-    status: LoanStatus;
   };
 }
 
@@ -168,10 +78,24 @@ export const api = {
   },
 
   async createLoanPayment(id: string, input: LoanPaymentInput) {
-    const response = await apiClient.post<ApiResponse<{
-      payment: { id: string; loanId: string; amount: number; paymentDate: string; note: string | null; createdAt: string };
-      loan: { id: string; paidAmount: number; remainingAmount: number; status: LoanStatus };
-    }>>(`/loans/${id}/payments`, input);
+    const response = await apiClient.post<
+      ApiResponse<{
+        payment: {
+          id: string;
+          loanId: string;
+          amount: number;
+          paymentDate: string;
+          note: string | null;
+          createdAt: string;
+        };
+        loan: {
+          id: string;
+          paidAmount: number;
+          remainingAmount: number;
+          status: LoanStatus;
+        };
+      }>
+    >(`/loans/${id}/payments`, input);
     return response.data.data;
   },
 

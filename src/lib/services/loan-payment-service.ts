@@ -6,7 +6,8 @@ import { z } from "zod";
 import * as schema from "@/db/schema";
 import { loans, loanPayments } from "@/db/schema";
 import { ApiError } from "@/lib/api-error";
-import { isValidDate } from "@/lib/validation";
+import { getLoanStatus } from "@/lib/loan-status";
+import { isValidDate, isValidLoanAmount } from "@/lib/validation";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL environment variable is missing");
@@ -14,24 +15,14 @@ if (!databaseUrl) throw new Error("DATABASE_URL environment variable is missing"
 const pool = new Pool({ connectionString: databaseUrl });
 const paymentDb = drizzle({ client: pool, schema });
 
-function isValidPaymentAmount(value: number) {
-  const [coefficient, exponentValue] = value.toString().toLowerCase().split("e");
-  const decimalPlaces = coefficient.split(".")[1]?.length ?? 0;
-  const exponent = Number(exponentValue ?? 0);
-
-  return (
-    Number.isFinite(value) &&
-    value > 0 &&
-    value <= 999_999_999_999.99 &&
-    Math.max(0, decimalPlaces - exponent) <= 2
-  );
-}
-
 const createPaymentSchema = z.object({
   amount: z.coerce
     .number()
     .finite()
-    .refine(isValidPaymentAmount, "Payment amount must be positive and have no more than two decimal places"),
+    .refine(
+      isValidLoanAmount,
+      "Payment amount must be positive and have no more than two decimal places",
+    ),
   paymentDate: z.string().refine(isValidDate, "Invalid payment date"),
   note: z.string().max(2000).optional().nullable(),
 });
@@ -66,14 +57,7 @@ async function getLoanPaymentSummary(tx: Parameters<Parameters<typeof paymentDb.
   const paidAmount = Number(paymentTotal[0]?.paidAmount ?? 0);
   const remainingAmount = Math.max(0, Number(loan.amount) - paidAmount);
   const today = new Date().toISOString().slice(0, 10);
-  const status =
-    remainingAmount === 0
-      ? "paid"
-      : loan.dueDate < today
-        ? "overdue"
-        : paidAmount > 0
-          ? "partially_paid"
-          : "active";
+  const status = getLoanStatus(remainingAmount, paidAmount, loan.dueDate, today);
   return {
     id: loan.id,
     originalAmount: Number(loan.amount),

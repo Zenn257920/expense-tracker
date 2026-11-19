@@ -1,33 +1,65 @@
 import { Suspense } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SettingsForm } from "@/components/settings/settings-form";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthSession } from "@/lib/auth-session";
 
 export default function SettingsPage() {
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-3xl">
-        <Suspense fallback={<SettingsLoading />}><SettingsDetails /></Suspense>
+    <main className="p-4 sm:p-6">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6">
+        <header>
+          <h1 className="text-2xl font-semibold">Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your profile and account security.
+          </p>
+        </header>
+
+        <Suspense fallback={<SettingsLoading />}>
+          <SettingsDetails />
+        </Suspense>
       </div>
-    </div>
+    </main>
   );
 }
 
 async function SettingsDetails() {
   const session = await getAuthSession();
+  if (!session) return null;
 
   return (
-    <Card className="mt-6">
-      <CardHeader><CardTitle>Account</CardTitle><CardDescription>Your profile details.</CardDescription></CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <div><p className="text-sm text-muted-foreground">Name</p><p className="mt-1 font-medium">{session?.user.name}</p></div>
-        <div><p className="text-sm text-muted-foreground">Email</p><p className="mt-1 font-medium">{session?.user.email}</p></div>
-      </CardContent>
-    </Card>
+    <SettingsForm
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+        emailVerified: session.user.emailVerified,
+      }}
+    />
   );
 }
 
 function SettingsLoading() {
-  return <Card className="mt-6"><CardContent className="flex flex-col gap-4 pt-5"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-1/2" /></CardContent></Card>;
+  return (
+    <div className="flex flex-col gap-6">
+      {[0, 1].map((item) => (
+        <Card key={item}>
+          <CardHeader>
+            <CardTitle>
+              <Skeleton className="h-5 w-36" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-32" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 }

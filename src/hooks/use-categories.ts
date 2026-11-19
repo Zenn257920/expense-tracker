@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
@@ -10,42 +10,31 @@ export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isMounted = useRef(false);
 
   const refreshCategories = useCallback(async () => {
     try {
-      setCategories(await api.getCategories());
-      setError(null);
+      const result = await api.getCategories();
+      if (isMounted.current) {
+        setCategories(result);
+        setError(null);
+      }
     } catch (err) {
-      setError(
-        getApiErrorMessage(err, "Could not load categories."),
-      );
+      if (isMounted.current) {
+        setError(getApiErrorMessage(err, "Could not load categories."));
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    api.getCategories()
-      .then((result) => {
-        if (isActive) setCategories(result);
-      })
-      .catch((err: unknown) => {
-        if (isActive) {
-          setError(
-            getApiErrorMessage(err, "Could not load categories."),
-          );
-        }
-      })
-      .finally(() => {
-        if (isActive) setIsLoading(false);
-      });
-
+    isMounted.current = true;
+    void refreshCategories();
     return () => {
-      isActive = false;
+      isMounted.current = false;
     };
-  }, []);
+  }, [refreshCategories]);
 
   return { categories, isLoading, error, refreshCategories };
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import AddTransactionDialog from "@/components/transactions/add-transaction-dialog";
 import RecentTransactions from "@/components/transactions/recent-transactions";
 import SearchBar from "@/components/ui/search-bar";
 import type { RecentTransaction } from "@/types/dashboard";
@@ -17,13 +16,12 @@ import type { TransactionType } from "@/types/dashboard";
 import { TablePagination } from "@/components/ui/table-pagination";
 
 const PAGE_SIZE = 5;
-const FETCH_LIMIT = 100;
 type TransactionTypeFilter = "all" | TransactionType;
 
 export default function TransactionsPage() {
-  const [allTransactions, setAllTransactions] = useState<RecentTransaction[]>(
-    [],
-  );
+  const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,38 +30,31 @@ export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
-  const { categories } = useCategories();
+  const {
+    categories,
+    isLoading: isLoadingCategories,
+    error: categoriesError,
+  } = useCategories();
 
   useEffect(() => {
     let isActive = true;
+    setIsLoading(true);
+    setError(null);
 
     async function loadTransactions() {
       try {
-        const firstPage = await api.getTransactions({
-          page: 1,
-          limit: FETCH_LIMIT,
-          search: "",
-          type: "all",
+        const result = await api.getTransactions({
+          page,
+          limit: PAGE_SIZE,
+          search,
+          type: typeFilter,
         });
-        const remainingPages = await Promise.all(
-          Array.from(
-            { length: Math.max(0, firstPage.pagination.totalPages - 1) },
-            (_, index) =>
-              api.getTransactions({
-                page: index + 2,
-                limit: FETCH_LIMIT,
-                search: "",
-                type: "all",
-              }),
-          ),
-        );
 
         if (isActive) {
           setError(null);
-          setAllTransactions([
-            ...firstPage.data,
-            ...remainingPages.flatMap((result) => result.data),
-          ]);
+          setTransactions(result.data);
+          setTotalTransactions(result.pagination.total);
+          setTotalPages(result.pagination.totalPages);
         }
       } catch (err) {
         if (isActive) {
@@ -79,25 +70,13 @@ export default function TransactionsPage() {
     return () => {
       isActive = false;
     };
-  }, [refreshKey]);
+  }, [page, refreshKey, search, typeFilter]);
 
-  const matchingTransactions = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return allTransactions.filter(
-      (transaction) =>
-        (typeFilter === "all" || transaction.type === typeFilter) &&
-        (!query ||
-          transaction.description.toLocaleLowerCase().includes(query) ||
-          transaction.categoryName.toLocaleLowerCase().includes(query)),
-    );
-  }, [allTransactions, search, typeFilter]);
-  const totalTransactions = matchingTransactions.length;
-  const totalPages = Math.ceil(totalTransactions / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(1, totalPages));
-  const transactions = matchingTransactions.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+
+  useEffect(() => {
+    if (page > currentPage) setPage(currentPage);
+  }, [currentPage, page]);
 
   const refreshTransactions = useCallback(() => {
     setIsLoading(true);
@@ -116,14 +95,12 @@ export default function TransactionsPage() {
           <p className="text-sm text-muted-foreground">
             Browse, search, and manage your transactions.
           </p>
-          <Button
-            variant="outline"
-            nativeButton={false}
-            render={<Link href="/transactions/new" />}
-          >
-            <Plus data-icon="inline-start" />
-            Add transaction
-          </Button>
+          <AddTransactionDialog
+            categories={categories}
+            isLoadingCategories={isLoadingCategories}
+            categoriesError={categoriesError}
+            onTransactionAdded={refreshTransactions}
+          />
         </div>
 
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

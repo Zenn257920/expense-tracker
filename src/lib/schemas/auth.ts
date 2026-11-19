@@ -13,5 +13,20 @@ export const signUpSchema = signInSchema.extend({
   path: ["confirmPassword"],
 });
 
+export const updateNameSchema = z.object({
+  name: z.string().trim().min(1, "Enter your name.").max(100, "Name is too long."),
+});
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password."),
+    newPassword: z.string().min(8, "Password must be at least 8 characters."),
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
 export type SignInFormValues = z.infer<typeof signInSchema>;
 export type SignUpFormValues = z.infer<typeof signUpSchema>;

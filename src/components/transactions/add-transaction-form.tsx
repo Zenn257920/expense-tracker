@@ -5,13 +5,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Field,
   FieldDescription,
   FieldError,
@@ -121,135 +114,120 @@ export default function AddTransactionForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add transaction</CardTitle>
-        <CardDescription>Record your income or expenses.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          onSubmit={handleSubmit}
-          onFocusCapture={() =>
-            setTransactionDate((date) => date || getTodayDate())
-          }
-          className="flex flex-col gap-5"
-        >
-          <FieldGroup className="gap-4">
-            <Field>
-              <FieldLabel>Transaction type</FieldLabel>
-              <div
-                role="group"
-                aria-label="Transaction type"
-                className="flex gap-2"
-              >
-                <Button
-                  type="button"
-                  variant={type === "expense" ? "default" : "outline"}
-                  aria-pressed={type === "expense"}
-                  className="flex-1 bg-red-500 hover:bg-red-400"
-                  onClick={() => handleTypeChange("expense")}
-                >
-                  Expense
-                </Button>
-                <Button
-                  type="button"
-                  variant={type === "income" ? "default" : "outline"}
-                  aria-pressed={type === "income"}
-                  className="flex-1 bg-green-500 hover:bg-green-600"
-                  onClick={() => handleTypeChange("income")}
-                >
-                  Income
-                </Button>
-              </div>
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="category">Category</FieldLabel>
-              <Select
-                items={categoryItems}
-                value={categoryId || null}
-                onValueChange={(value) => setCategoryId(value ?? "")}
-                disabled={isLoadingCategories}
-              >
-                <SelectTrigger id="category" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {categoryItems.map((item) => (
-                      <SelectItem
-                        key={item.value ?? "empty"}
-                        value={item.value}
-                      >
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {!isLoadingCategories && filteredCategories.length === 0 && (
-                <FieldDescription>
-                  No {type} categories found. Create a category first.
-                </FieldDescription>
-              )}
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="description">Description</FieldLabel>
-              <Input
-                id="description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="e.g. Lunch, Salary, Shopping"
-                maxLength={500}
-                required
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="amount">Amount (MMK)</FieldLabel>
-              <Input
-                id="amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder="Enter amount"
-                required
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="transactionDate">
-                Transaction date
-              </FieldLabel>
-              <Input
-                id="transactionDate"
-                type="date"
-                value={transactionDate}
-                onChange={(event) => setTransactionDate(event.target.value)}
-                required
-              />
-            </Field>
-          </FieldGroup>
-
-          {formError && <FieldError>{formError}</FieldError>}
-          <Button
-            type="submit"
-            variant="zinc"
-            disabled={
-              isSubmitting ||
-              isLoadingCategories ||
-              filteredCategories.length === 0
-            }
-            className="w-full"
+    <form
+      onSubmit={handleSubmit}
+      onFocusCapture={() => setTransactionDate((date) => date || getTodayDate())}
+      className="flex flex-col gap-5"
+    >
+      <FieldGroup className="grid gap-4 sm:grid-cols-2">
+        <Field className="sm:col-span-2">
+          <FieldLabel>Transaction type</FieldLabel>
+          <div
+            role="group"
+            aria-label="Transaction type"
+            className="flex gap-2"
           >
-            {isSubmitting && <Spinner data-icon="inline-start" />}
-            {isSubmitting ? "Saving..." : "Add transaction"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            <Button
+              type="button"
+              variant={type === "expense" ? "default" : "outline"}
+              aria-pressed={type === "expense"}
+              className="flex-1 bg-red-500 hover:bg-red-400"
+              onClick={() => handleTypeChange("expense")}
+            >
+              Expense
+            </Button>
+            <Button
+              type="button"
+              variant={type === "income" ? "default" : "outline"}
+              aria-pressed={type === "income"}
+              className="flex-1 bg-green-500 hover:bg-green-600"
+              onClick={() => handleTypeChange("income")}
+            >
+              Income
+            </Button>
+          </div>
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="category">Category</FieldLabel>
+          <Select
+            items={categoryItems}
+            value={categoryId || null}
+            onValueChange={(value) => setCategoryId(value ?? "")}
+            disabled={isLoadingCategories}
+          >
+            <SelectTrigger id="category" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {categoryItems.map((item) => (
+                  <SelectItem key={item.value ?? "empty"} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          {!isLoadingCategories && filteredCategories.length === 0 && (
+            <FieldDescription>
+              No {type} categories found. Create a category first.
+            </FieldDescription>
+          )}
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="description">Description</FieldLabel>
+          <Input
+            id="description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="e.g. Lunch, Salary, Shopping"
+            maxLength={500}
+            required
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="amount">Amount (MMK)</FieldLabel>
+          <Input
+            id="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="Enter amount"
+            required
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="transactionDate">Transaction date</FieldLabel>
+          <Input
+            id="transactionDate"
+            type="date"
+            value={transactionDate}
+            onChange={(event) => setTransactionDate(event.target.value)}
+            required
+          />
+        </Field>
+      </FieldGroup>
+
+      {formError && <FieldError>{formError}</FieldError>}
+      <Button
+        type="submit"
+        variant="zinc"
+        disabled={
+          isSubmitting ||
+          isLoadingCategories ||
+          filteredCategories.length === 0
+        }
+        className="w-full"
+      >
+        {isSubmitting && <Spinner data-icon="inline-start" />}
+        {isSubmitting ? "Saving..." : "Add transaction"}
+      </Button>
+    </form>
   );
 }

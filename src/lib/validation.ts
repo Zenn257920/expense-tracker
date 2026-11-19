@@ -18,3 +18,16 @@ export function isValidAmount(value: number) {
     Math.max(0, decimalPlaces - exponent) <= 2
   );
 }
+
+export function isValidLoanAmount(value: number) {
+  const [coefficient, exponentValue] = value.toString().toLowerCase().split("e");
+  const decimalPlaces = coefficient.split(".")[1]?.length ?? 0;
+  const exponent = Number(exponentValue ?? 0);
+
+  return (
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= 999_999_999_999.99 &&
+    Math.max(0, decimalPlaces - exponent) <= 2
+  );
+}

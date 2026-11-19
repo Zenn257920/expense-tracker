@@ -17,7 +17,7 @@ import LoanPaymentHistoryDialog from "@/components/loans/loan-payment-history-di
 import LoanRecordPaymentDialog from "@/components/loans/loan-record-payment-dialog";
 import LoanRecentPaymentsDialog from "@/components/loans/loan-recent-payments-dialog";
 import { api } from "@/lib/api";
-import type { LoanPaymentInput, RecentLoanPayment } from "@/lib/api";
+import type { LoanPaymentInput, RecentLoanPayment } from "@/types/api";
 import {
   calculateLoanOverview,
   calculateLoanProgress,
@@ -169,7 +169,7 @@ export default function LoanPage() {
         type: editForm.type,
         amount: Number(editForm.amount),
         interestRate: Number(editForm.interestRate),
-        startDate: editForm.borrowedDate,
+        borrowedDate: editForm.borrowedDate,
         dueDate: editForm.dueDate,
         description: editForm.description?.trim() || null,
       });
