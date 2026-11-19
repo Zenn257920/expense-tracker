@@ -100,7 +100,7 @@ export default function DashboardPage() {
           <SummaryCard
             title="Total Balance"
             amount={formatAmount(summary.balance) + " MMK"}
-            description="Your current balance"
+            description="Includes outstanding borrowed and lent amounts"
             icon="balance"
           />
 

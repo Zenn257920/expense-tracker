@@ -30,11 +30,27 @@ export function useCategories() {
 
   useEffect(() => {
     isMounted.current = true;
-    void refreshCategories();
+
+    api.getCategories()
+      .then((result) => {
+        if (isMounted.current) {
+          setCategories(result);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (isMounted.current) {
+          setError(getApiErrorMessage(err, "Could not load categories."));
+        }
+      })
+      .finally(() => {
+        if (isMounted.current) setIsLoading(false);
+      });
+
     return () => {
       isMounted.current = false;
     };
-  }, [refreshCategories]);
+  }, []);
 
   return { categories, isLoading, error, refreshCategories };
 }

@@ -1,7 +1,7 @@
 import { and, eq, gte, lt, sql, sum } from "drizzle-orm";
 
 import { db } from "@/db";
-import { categories, transactions } from "@/db/schema";
+import { categories, loans, loanPayments, transactions } from "@/db/schema";
 
 function toCents(value: string | null) {
   if (!value) return 0n;
@@ -27,7 +27,16 @@ export async function getDashboardSummary(userId: string) {
   const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
   const startOfTrend = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)).toISOString().slice(0, 10);
 
-  const [totals, monthlyResults, dailyResults] = await Promise.all([
+  const paymentTotals = db
+    .select({
+      loanId: loanPayments.loanId,
+      paidAmount: sum(loanPayments.amount).as("paid_amount"),
+    })
+    .from(loanPayments)
+    .groupBy(loanPayments.loanId)
+    .as("payment_totals");
+
+  const [totals, monthlyResults, dailyResults, loanResults] = await Promise.all([
     db.select({ type: categories.type, total: sum(transactions.amount) })
       .from(transactions)
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -59,10 +68,24 @@ export async function getDashboardSummary(userId: string) {
         lt(transactions.transactionDate, startOfTomorrow),
       ))
       .groupBy(transactions.transactionDate, categories.type),
+    db.select({
+      type: loans.type,
+      remainingAmount: sql<string>`coalesce(sum(${loans.amount} - coalesce(${paymentTotals.paidAmount}, 0)), 0)::text`,
+    })
+      .from(loans)
+      .leftJoin(paymentTotals, eq(loans.id, paymentTotals.loanId))
+      .where(eq(loans.userId, userId))
+      .groupBy(loans.type),
   ]);
 
   const totalIncome = toCents(totals.find((item) => item.type === "income")?.total ?? null);
   const totalExpenses = toCents(totals.find((item) => item.type === "expense")?.total ?? null);
+  const borrowedRemaining = toCents(
+    loanResults.find((item) => item.type === "borrowed")?.remainingAmount ?? null,
+  );
+  const lentRemaining = toCents(
+    loanResults.find((item) => item.type === "lent")?.remainingAmount ?? null,
+  );
   const trend = new Map<string, { income: bigint; expenses: bigint }>();
 
   for (const item of monthlyResults) {
@@ -103,7 +126,9 @@ export async function getDashboardSummary(userId: string) {
   return {
     totalIncome: formatAmount(totalIncome),
     totalExpenses: formatAmount(totalExpenses),
-    balance: formatAmount(totalIncome - totalExpenses),
+    balance: formatAmount(
+      totalIncome - totalExpenses + borrowedRemaining - lentRemaining,
+    ),
     monthlyTrend,
     dailyTrend,
   };

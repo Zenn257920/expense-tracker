@@ -36,15 +36,15 @@ export default function TransactionsPage() {
     error: categoriesError,
   } = useCategories();
 
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+
   useEffect(() => {
     let isActive = true;
-    setIsLoading(true);
-    setError(null);
 
     async function loadTransactions() {
       try {
         const result = await api.getTransactions({
-          page,
+          page: currentPage,
           limit: PAGE_SIZE,
           search,
           type: typeFilter,
@@ -70,13 +70,7 @@ export default function TransactionsPage() {
     return () => {
       isActive = false;
     };
-  }, [page, refreshKey, search, typeFilter]);
-
-  const currentPage = Math.min(page, Math.max(1, totalPages));
-
-  useEffect(() => {
-    if (page > currentPage) setPage(currentPage);
-  }, [currentPage, page]);
+  }, [currentPage, refreshKey, search, typeFilter]);
 
   const refreshTransactions = useCallback(() => {
     setIsLoading(true);
@@ -109,6 +103,7 @@ export default function TransactionsPage() {
             onValueChange={(value) => {
               if (value && value !== typeFilter) {
                 setError(null);
+                setIsLoading(true);
                 setTypeFilter(value as TransactionTypeFilter);
                 setPage(1);
               }
@@ -127,12 +122,14 @@ export default function TransactionsPage() {
             onChange={setSearchInput}
             onSearch={(query) => {
               setError(null);
+              setIsLoading(true);
               setSearch(query);
               setPage(1);
             }}
             onReset={() => {
               setSearchInput("");
               setError(null);
+              setIsLoading(true);
               setSearch("");
               setPage(1);
             }}
@@ -174,7 +171,10 @@ export default function TransactionsPage() {
             totalItems={totalTransactions}
             pageSize={PAGE_SIZE}
             itemLabel="transactions"
-            onPageChange={setPage}
+            onPageChange={(nextPage) => {
+              setIsLoading(true);
+              setPage(nextPage);
+            }}
           />
         )}
       </div>
