@@ -26,6 +26,7 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
 import {
+  detectVoiceLanguage,
   parseVoiceTransaction,
   type ParsedVoiceTransaction,
 } from "@/lib/parse-voice-transaction";
@@ -65,6 +66,24 @@ export default function AddTransactionForm({
   const [voiceResult, setVoiceResult] = useState<ParsedVoiceTransaction | null>(
     null,
   );
+  // Burmese first: Kaung speaks Burmese most of the time, and the parser
+  // now understands Burmese digits, number words (ထောင်/သိန်း) and
+  // categories. English is one tap away. Note: Chrome's speech service
+  // handles my-MM best on Android/Chrome; if it mishears, switch to English.
+  const [voiceLang, setVoiceLang] = useState<"en-US" | "my-MM">("my-MM");
+
+  const voiceExamples =
+    voiceLang === "my-MM"
+      ? [
+          "နေ့လည်စာ ငါးထောင် သုံးတယ်",
+          "တက္ကစီ တစ်သောင်း ပေးတယ် မနေ့က",
+          "လစာ ငါးသိန်း ရတယ်",
+        ]
+      : [
+          "Spent 5000 on lunch",
+          "Paid 10000 for taxi yesterday",
+          "Received salary 500000",
+        ];
 
   const handleVoiceTranscript = useCallback(
     (recognizedTranscript: string) => {
@@ -94,7 +113,25 @@ export default function AddTransactionForm({
     startListening,
     stopListening,
     resetTranscript,
-  } = useSpeechRecognition("en-US", handleVoiceTranscript);
+  } = useSpeechRecognition(voiceLang, handleVoiceTranscript);
+
+  const [triedExample, setTriedExample] = useState("");
+  const shownTranscript = transcript || triedExample;
+
+  function handleTryExample(example: string) {
+    // Parse without the microphone — useful when mic access is blocked,
+    // and for checking how a phrase will be understood before speaking it.
+    setTriedExample(example);
+    handleVoiceTranscript(example);
+  }
+
+  function handleVoiceLangChange(nextLang: "en-US" | "my-MM") {
+    if (isListening) return;
+    setVoiceLang(nextLang);
+    setTriedExample("");
+    resetTranscript();
+    setVoiceResult(null);
+  }
 
   const filteredCategories = categories.filter(
     (category) => category.type === type,
@@ -114,11 +151,13 @@ export default function AddTransactionForm({
   }
 
   function handleStartListening() {
+    setTriedExample("");
     setVoiceResult(null);
     startListening();
   }
 
   function handleClearVoiceInput() {
+    setTriedExample("");
     resetTranscript();
     setVoiceResult(null);
   }
@@ -182,6 +221,32 @@ export default function AddTransactionForm({
                 ? "Listening... Speak now."
                 : "Tap the microphone and speak your transaction."}
             </p>
+            <div
+              role="group"
+              aria-label="Voice language"
+              className="mt-2 flex gap-1"
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant={voiceLang === "my-MM" ? "default" : "outline"}
+                aria-pressed={voiceLang === "my-MM"}
+                disabled={isListening}
+                onClick={() => handleVoiceLangChange("my-MM")}
+              >
+                မြန်မာ
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={voiceLang === "en-US" ? "default" : "outline"}
+                aria-pressed={voiceLang === "en-US"}
+                disabled={isListening}
+                onClick={() => handleVoiceLangChange("en-US")}
+              >
+                English
+              </Button>
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -208,7 +273,7 @@ export default function AddTransactionForm({
               </Button>
             )}
 
-            {transcript && !isListening && (
+            {shownTranscript && !isListening && (
               <Button
                 type="button"
                 variant="ghost"
@@ -237,15 +302,52 @@ export default function AddTransactionForm({
 
         {speechError && <FieldError>{speechError}</FieldError>}
 
-        {transcript && (
+        {!isListening && !shownTranscript && (
+          <div className="flex flex-col gap-2 border-t pt-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Try saying — tap an example to see how it is understood:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {voiceExamples.map((example) => (
+                <Button
+                  key={example}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleTryExample(example)}
+                >
+                  “{example}”
+                </Button>
+              ))}
+            </div>
+            {voiceLang === "my-MM" && (
+              <p className="text-xs text-muted-foreground">
+                Burmese recognition depends on Chrome — if it mishears, switch
+                to English above.
+              </p>
+            )}
+          </div>
+        )}
+
+        {shownTranscript && (
           <div className="flex flex-col gap-3 border-t pt-3">
             <div>
               <p className="text-xs font-medium text-muted-foreground">
                 Recognized speech
               </p>
               <p className="mt-1" aria-live="polite">
-                “{transcript}”
+                “{shownTranscript}”
               </p>
+              {shownTranscript &&
+                detectVoiceLanguage(shownTranscript) !== voiceLang && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    That sounded like{" "}
+                    {detectVoiceLanguage(shownTranscript) === "my-MM"
+                      ? "Burmese"
+                      : "English"}
+                    — switch the language above if the words look wrong.
+                  </p>
+                )}
             </div>
 
             {isListening && (
@@ -292,6 +394,29 @@ export default function AddTransactionForm({
                   <FieldDescription>
                     We could not identify one clear amount. Enter or correct it
                     manually.
+                  </FieldDescription>
+                )}
+                {voiceResult.amountAmbiguous && voiceResult.amount !== null && (
+                  <FieldDescription>
+                    Heard more than one number — check the amount above before
+                    saving.
+                  </FieldDescription>
+                )}
+                {voiceResult.missingFields.length > 0 && (
+                  <FieldDescription>
+                    Still needed:{" "}
+                    {voiceResult.missingFields
+                      .map((field) =>
+                        field === "amount"
+                          ? "amount"
+                          : field === "category"
+                            ? "a matching category (pick one below)"
+                            : field === "type"
+                              ? "income or expense"
+                              : "a description",
+                      )
+                      .join(", ")}
+                    .
                   </FieldDescription>
                 )}
               </div>

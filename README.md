@@ -7,6 +7,14 @@ A personal finance dashboard for tracking income and expenses by category.
 - Dashboard totals and a six-month income and expense chart
 - Create and browse income and expense categories
 - Add, search, edit, and delete transactions
+- Add a transaction by voice: tap the microphone in the Add transaction
+  dialog, speak in Burmese (မြန်မာ) or English, review the filled-in
+  amount / type / category / date, then save. Examples: "နေ့လည်စာ ငါးထောင်
+  သုံးတယ်", "တက္ကစီ တစ်သောင်း ပေးတယ် မနေ့က", "Spent 5000 on lunch".
+  Voice uses the browser's built-in speech recognition (Chrome works
+  best; no API key needed) and a local parser — the app does not call an
+  AI service at runtime. Tap an example phrase in the dialog to see how
+  it is understood without using the microphone.
 - PostgreSQL persistence through Neon and Drizzle ORM
 
 ## Setup
@@ -46,3 +54,6 @@ migrated before testing signup. Keep `.env.local` and real credentials out of Gi
 - `pnpm db:generate` — generate a migration from schema changes
 - `pnpm db:migrate` — apply pending migrations
 - `pnpm db:studio` — open Drizzle Studio
+- `npx tsx scripts/verify-voice-parse.ts` — check the voice parser
+  against English and Burmese example phrases (12 cases, no test
+  framework needed)
