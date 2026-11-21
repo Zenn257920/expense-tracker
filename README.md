@@ -14,7 +14,8 @@ A personal finance dashboard for tracking income and expenses by category.
   Voice uses the browser's built-in speech recognition (Chrome works
   best; no API key needed) and a local parser — the app does not call an
   AI service at runtime. Tap an example phrase in the dialog to see how
-  it is understood without using the microphone.
+  it is understood without using the microphone. If the spoken category
+  (e.g. Food) does not exist yet, the dialog offers to create it for you.
 - PostgreSQL persistence through Neon and Drizzle ORM
 
 ## Setup

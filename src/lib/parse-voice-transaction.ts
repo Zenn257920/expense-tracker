@@ -277,14 +277,30 @@ function normalizeDigits(text: string) {
   return text.replace(/[၀-၉]/g, (digit) => BURMESE_DIGITS[digit] ?? digit);
 }
 
+function normalizeTranscript(text: string) {
+  let normalized = normalizeDigits(text);
+  // "တစ်ထောင်" (1000) is spoken/colloquially written "တထောင်", and speech
+  // recognition often hears it as "သထောင်" — same for သောင်း/သိန်း/သန်း.
+  // Normalise a lone တ/သ before a multiplier to တစ် so the amount
+  // parser sees a real number word.
+  normalized = normalized
+    .replace(/သ(?=ထောင်|သောင်း|သိန်း|သန်း|ရာ)/g, "တစ်")
+    .replace(/(^|[^\p{L}])တ(?=ထောင်|သောင်း|သိန်း|သန်း|ရာ)/gu, "$1တစ်");
+  return normalized;
+}
+
 /**
  * `\b` is ASCII-only, so it never matches Burmese word boundaries.
  * Use Unicode letter/number boundaries instead, so both English and
  * Burmese phrases match.
  */
 function includesPhrase(text: string, phrase: string) {
-  const escapedPhrase = phrase
-    .trim()
+  const trimmed = phrase.trim();
+  // Burmese is written without spaces, so words join into compounds
+  // ("ကော်ဖီဖိုး" = coffee + cost) and word boundaries never match.
+  // For Myanmar script, substring matching is the correct test.
+  if (/[\u1000-\u109F]/.test(trimmed)) return text.includes(trimmed);
+  const escapedPhrase = trimmed
     .split(/\s+/)
     .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("\\s+");
@@ -312,7 +328,7 @@ interface AmountCandidate {
  * - multipliers / currency units (k, thousand, ထောင်, သောင်း, သိန်း, ကျပ်)
  */
 function findAmountCandidates(text: string): AmountCandidate[] {
-  const normalized = normalizeDigits(text);
+  const normalized = normalizeTranscript(text);
   const numberWordPattern = [
     ...Object.keys(ENGLISH_NUMBER_WORDS),
     ...Object.keys(BURMESE_NUMBER_WORDS).sort((a, b) => b.length - a.length),
@@ -329,6 +345,7 @@ function findAmountCandidates(text: string): AmountCandidate[] {
   );
 
   const candidates: AmountCandidate[] = [];
+  const consumedSpans: Array<[number, number]> = [];
   for (const match of normalized.matchAll(pattern)) {
     const rawNumber = match[1];
     const suffix = match[2]?.toLowerCase();
@@ -357,6 +374,30 @@ function findAmountCandidates(text: string): AmountCandidate[] {
       hasUnit: Boolean(suffix),
       index: match.index ?? 0,
     });
+    consumedSpans.push([
+      match.index ?? 0,
+      (match.index ?? 0) + match[0].length,
+    ]);
+  }
+
+  // A multiplier on its own means one of it: "ထောင်" = 1000, "သိန်း" =
+  // 100,000, "a thousand" = 1000. This covers phrases where the number
+  // was swallowed by the compound ("ကော်ဖီဖိုးသထောင်") or left out.
+  const bareMultiplierPattern = new RegExp(
+    `(ထောင်|သောင်း|သိန်း|သန်း|ရာ|thousand|hundred)`,
+    "giu",
+  );
+  for (const match of normalized.matchAll(bareMultiplierPattern)) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    if (consumedSpans.some(([from, to]) => start >= from && start < to)) {
+      continue;
+    }
+    const value = MULTIPLIERS[match[0].toLowerCase()] ?? 0;
+    if (value > 0) {
+      candidates.push({ value, hasUnit: true, index: start });
+      consumedSpans.push([start, end]);
+    }
   }
   return candidates;
 }
@@ -437,7 +478,7 @@ function findExistingCategory(
 }
 
 function extractDescription(text: string) {
-  const normalized = normalizeDigits(text);
+  const normalized = normalizeTranscript(text);
   // Remove every amount-like span first, so "5000" never lands in the
   // description, then strip dates / currency / filler verbs.
   const numberWordPattern = [
@@ -468,6 +509,12 @@ function extractDescription(text: string) {
       start + match[0].length,
     )}`;
   }
+
+  // A bare multiplier left over after amount removal ("ကော်ဖီထောင်").
+  description = description.replace(
+    /ထောင်|သောင်း|သိန်း|သန်း|ရာ|\bthousand\b|\bhundred\b/gi,
+    " ",
+  );
 
   description = description
     .replace(/\bday before yesterday\b/gi, " ")
@@ -505,7 +552,7 @@ export function parseVoiceTransaction(
   categories: Category[] = [],
   now = new Date(),
 ): ParsedVoiceTransaction {
-  const normalizedText = transcript.trim();
+  const normalizedText = normalizeTranscript(transcript.trim());
   const hasExpenseKeyword = matchesAny(normalizedText, expenseKeywords);
   const hasIncomeKeyword = matchesAny(normalizedText, incomeKeywords);
   const hasConflictingTypes = hasExpenseKeyword && hasIncomeKeyword;

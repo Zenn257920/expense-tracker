@@ -38,6 +38,7 @@ interface AddTransactionFormProps {
   isLoadingCategories: boolean;
   categoriesError: string | null;
   onTransactionAdded: () => void | Promise<void>;
+  onCategoriesChanged?: () => void | Promise<void>;
 }
 
 type TransactionType = Category["type"];
@@ -55,6 +56,7 @@ export default function AddTransactionForm({
   isLoadingCategories,
   categoriesError,
   onTransactionAdded,
+  onCategoriesChanged,
 }: AddTransactionFormProps) {
   const [type, setType] = useState<TransactionType>("expense");
   const [categoryId, setCategoryId] = useState("");
@@ -62,7 +64,36 @@ export default function AddTransactionForm({
   const [amount, setAmount] = useState("");
   const [transactionDate, setTransactionDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [error, setError] = useState("");
+
+  async function handleCreateSuggestedCategory() {
+    if (
+      !voiceResult?.categoryName ||
+      !voiceResult.type ||
+      categoryId ||
+      isCreatingCategory
+    ) {
+      return;
+    }
+    try {
+      setIsCreatingCategory(true);
+      setError("");
+      const created = await api.createCategory({
+        name: voiceResult.categoryName,
+        type: voiceResult.type,
+      });
+      await onCategoriesChanged?.();
+      setCategoryId(created.id);
+      toast.success(`Category "${created.name}" created.`);
+    } catch (err) {
+      setError(
+        getApiErrorMessage(err, "Could not create that category. Try again."),
+      );
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  }
   const [voiceResult, setVoiceResult] = useState<ParsedVoiceTransaction | null>(
     null,
   );
@@ -468,6 +499,26 @@ export default function AddTransactionForm({
                     .
                   </FieldDescription>
                 )}
+                {voiceResult.categoryName &&
+                  !categoryId &&
+                  voiceResult.type &&
+                  type === voiceResult.type && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FieldDescription>
+                        No “{voiceResult.categoryName}” category yet.
+                      </FieldDescription>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCreateSuggestedCategory}
+                        disabled={isCreatingCategory || isSubmitting}
+                      >
+                        {isCreatingCategory && <Spinner data-icon="inline-start" />}
+                        Create “{voiceResult.categoryName}” category
+                      </Button>
+                    </div>
+                  )}
               </div>
             )}
           </div>

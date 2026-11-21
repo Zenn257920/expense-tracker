@@ -99,6 +99,34 @@ const cases: Case[] = [
     categoryId: "food-mm",
     description: "အစားအသောက်",
   },
+  // Reported by Kaung 2026-11-21: "ကော်ဖီဖိုးသထောင်" was heard as one
+  // compound word — no amount, no category, type stayed Income.
+  {
+    input: "ကော်ဖီဖိုးသထောင်",
+    amount: 1000,
+    type: "expense",
+    categoryId: "food-1",
+    description: "ကော်ဖီဖိုး",
+  },
+  {
+    input: "ကော်ဖီဖိုး တစ်ထောင်",
+    amount: 1000,
+    type: "expense",
+    categoryId: "food-1",
+    description: "ကော်ဖီဖိုး",
+  },
+  {
+    input: "ကော်ဖီဖိုး တထောင်",
+    amount: 1000,
+    type: "expense",
+    categoryId: "food-1",
+  },
+  {
+    input: "ကော်ဖီထောင်",
+    amount: 1000,
+    type: "expense",
+    categoryId: "food-1",
+  },
 ];
 
 let failures = 0;

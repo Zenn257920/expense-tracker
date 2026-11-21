@@ -20,6 +20,7 @@ interface AddTransactionDialogProps {
   isLoadingCategories: boolean;
   categoriesError: string | null;
   onTransactionAdded: () => void | Promise<void>;
+  onCategoriesChanged?: () => void | Promise<void>;
 }
 
 export default function AddTransactionDialog({
@@ -27,6 +28,7 @@ export default function AddTransactionDialog({
   isLoadingCategories,
   categoriesError,
   onTransactionAdded,
+  onCategoriesChanged,
 }: AddTransactionDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -57,6 +59,7 @@ export default function AddTransactionDialog({
           isLoadingCategories={isLoadingCategories}
           categoriesError={categoriesError}
           onTransactionAdded={handleTransactionAdded}
+          onCategoriesChanged={onCategoriesChanged}
         />
       </DialogContent>
     </Dialog>

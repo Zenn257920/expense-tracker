@@ -34,6 +34,7 @@ export default function TransactionsPage() {
     categories,
     isLoading: isLoadingCategories,
     error: categoriesError,
+    refreshCategories,
   } = useCategories();
 
   const currentPage = Math.min(page, Math.max(1, totalPages));
@@ -94,6 +95,7 @@ export default function TransactionsPage() {
             isLoadingCategories={isLoadingCategories}
             categoriesError={categoriesError}
             onTransactionAdded={refreshTransactions}
+            onCategoriesChanged={refreshCategories}
           />
         </div>
 
