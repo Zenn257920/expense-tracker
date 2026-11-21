@@ -127,6 +127,16 @@ const cases: Case[] = [
     type: "expense",
     categoryId: "food-1",
   },
+  // Reported by Kaung 2026-11-21: amount + type are right, but no category
+  // can be guessed from "going out" — the form must offer a generic
+  // "+ New category" instead of a suggested one.
+  {
+    input: "အပြင်သွားတာ တသောင်း ကုန်တယ်",
+    amount: 10000,
+    type: "expense",
+    categoryId: null,
+    description: "အပြင်သွားတာ",
+  },
 ];
 
 let failures = 0;

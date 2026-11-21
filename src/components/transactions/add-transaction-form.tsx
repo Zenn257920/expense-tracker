@@ -65,26 +65,24 @@ export default function AddTransactionForm({
   const [transactionDate, setTransactionDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [error, setError] = useState("");
 
-  async function handleCreateSuggestedCategory() {
-    if (
-      !voiceResult?.categoryName ||
-      !voiceResult.type ||
-      categoryId ||
-      isCreatingCategory
-    ) {
-      return;
-    }
+  async function handleCreateCategory(name: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName || categoryId || isCreatingCategory) return;
     try {
       setIsCreatingCategory(true);
       setError("");
       const created = await api.createCategory({
-        name: voiceResult.categoryName,
-        type: voiceResult.type,
+        name: trimmedName,
+        type,
       });
       await onCategoriesChanged?.();
       setCategoryId(created.id);
+      setNewCategoryName("");
+      setShowNewCategory(false);
       toast.success(`Category "${created.name}" created.`);
     } catch (err) {
       setError(
@@ -93,6 +91,11 @@ export default function AddTransactionForm({
     } finally {
       setIsCreatingCategory(false);
     }
+  }
+
+  async function handleCreateSuggestedCategory() {
+    if (!voiceResult?.categoryName || !voiceResult.type) return;
+    await handleCreateCategory(voiceResult.categoryName);
   }
   const [voiceResult, setVoiceResult] = useState<ParsedVoiceTransaction | null>(
     null,
@@ -519,6 +522,12 @@ export default function AddTransactionForm({
                       </Button>
                     </div>
                   )}
+                {!voiceResult.categoryName && !categoryId && (
+                  <FieldDescription>
+                    No category was heard in that phrase — use “+ New
+                    category” under Category below to make one (e.g. Outing).
+                  </FieldDescription>
+                )}
               </div>
             )}
           </div>
@@ -579,6 +588,66 @@ export default function AddTransactionForm({
             <FieldDescription>
               No {type} categories found. Create a category first.
             </FieldDescription>
+          )}
+          {!showNewCategory ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-fit px-0"
+              onClick={() => {
+                setNewCategoryName(
+                  voiceResult?.categoryName && !categoryId
+                    ? voiceResult.categoryName
+                    : "",
+                );
+                setShowNewCategory(true);
+              }}
+              disabled={isCreatingCategory || isSubmitting}
+            >
+              + New category
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleCreateCategory(newCategoryName);
+                  }
+                }}
+                placeholder={
+                  type === "income" ? "e.g. Salary" : "e.g. Food, Outing"
+                }
+                aria-label="New category name"
+                maxLength={100}
+                autoFocus
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCreateCategory(newCategoryName)}
+                disabled={!newCategoryName.trim() || isCreatingCategory}
+              >
+                {isCreatingCategory && <Spinner data-icon="inline-start" />}
+                Create
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowNewCategory(false);
+                  setNewCategoryName("");
+                }}
+                disabled={isCreatingCategory}
+              >
+                Cancel
+              </Button>
+            </div>
           )}
         </Field>
 
