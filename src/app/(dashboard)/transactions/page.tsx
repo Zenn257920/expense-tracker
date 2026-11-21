@@ -9,11 +9,26 @@ import { useCategories } from "@/hooks/use-categories";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
 import TransactionsSkeleton from "@/components/transactions/transactions-skeleton";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FieldError } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import Input from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TransactionType } from "@/types/dashboard";
 import { TablePagination } from "@/components/ui/table-pagination";
+
+function toCsvCell(value: string) {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
 
 const PAGE_SIZE = 5;
 type TransactionTypeFilter = "all" | TransactionType;
@@ -29,6 +44,10 @@ export default function TransactionsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
+  const [categoryId, setCategoryId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
   const {
@@ -50,6 +69,9 @@ export default function TransactionsPage() {
           limit: PAGE_SIZE,
           search,
           type: typeFilter,
+          categoryId: categoryId || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
         });
 
         if (isActive) {
@@ -75,13 +97,77 @@ export default function TransactionsPage() {
     return () => {
       isActive = false;
     };
-  }, [currentPage, refreshKey, search, typeFilter]);
+  }, [currentPage, refreshKey, search, typeFilter, categoryId, startDate, endDate]);
 
   const refreshTransactions = useCallback(() => {
     setIsLoading(true);
     setError(null);
     setRefreshKey((key) => key + 1);
   }, []);
+
+  const hasFilters = Boolean(categoryId || startDate || endDate);
+
+  function applyFilterChange() {
+    setError(null);
+    setIsLoading(true);
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setCategoryId("");
+    setStartDate("");
+    setEndDate("");
+    applyFilterChange();
+  }
+
+  async function handleExportCsv() {
+    setIsExporting(true);
+    try {
+      // The API caps a page at 100 rows, so page through all matches.
+      const filters = {
+        search,
+        type: typeFilter,
+        categoryId: categoryId || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      };
+      const first = await api.getTransactions({ ...filters, page: 1, limit: 100 });
+      const all = [...first.data];
+      const totalPages = first.pagination.totalPages;
+      for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
+        const result = await api.getTransactions({ ...filters, page: nextPage, limit: 100 });
+        all.push(...result.data);
+      }
+
+      const header = ["Date", "Description", "Category", "Type", "Amount (MMK)"];
+      const lines = all.map((transaction) =>
+        [
+          transaction.transactionDate,
+          transaction.description,
+          transaction.categoryName,
+          transaction.type,
+          transaction.amount,
+        ].map(toCsvCell).join(","),
+      );
+      const blob = new Blob([[header.join(","), ...lines].join("\n")], {
+        type: "text/csv;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not export transactions."));
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  const categoryOptions = categories.filter(
+    (category) => typeFilter === "all" || category.type === typeFilter,
+  );
 
   // Full skeleton only on the very first load. Later refreshes (add/edit/
   // delete, search, tab change) keep the list visible instead of flashing
@@ -114,6 +200,8 @@ export default function TransactionsPage() {
                 setError(null);
                 setIsLoading(true);
                 setTypeFilter(value as TransactionTypeFilter);
+                // The chosen category may not exist for the new type.
+                setCategoryId("");
                 setPage(1);
               }
             }}
@@ -143,6 +231,89 @@ export default function TransactionsPage() {
               setPage(1);
             }}
           />
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <Field className="sm:min-w-48">
+            <FieldLabel htmlFor="filter-category">Category</FieldLabel>
+            <Select
+              items={[
+                { label: "All categories", value: "all" },
+                ...categoryOptions.map((category) => ({
+                  label: category.name,
+                  value: category.id,
+                })),
+              ]}
+              value={categoryId || "all"}
+              onValueChange={(value) => {
+                setCategoryId(value === "all" ? "" : (value ?? ""));
+                applyFilterChange();
+              }}
+            >
+              <SelectTrigger id="filter-category" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {categoryOptions.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="filter-start-date">From</FieldLabel>
+            <Input
+              id="filter-start-date"
+              type="date"
+              value={startDate}
+              onChange={(event) => {
+                setStartDate(event.target.value);
+                applyFilterChange();
+              }}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="filter-end-date">To</FieldLabel>
+            <Input
+              id="filter-end-date"
+              type="date"
+              value={endDate}
+              onChange={(event) => {
+                setEndDate(event.target.value);
+                applyFilterChange();
+              }}
+            />
+          </Field>
+          <div className="flex gap-2">
+            {hasFilters && (
+              <Button type="button" variant="outline" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isExporting || totalTransactions === 0}
+              onClick={handleExportCsv}
+            >
+              {isExporting ? (
+                <>
+                  <Spinner data-icon="inline-start" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download data-icon="inline-start" />
+                  Export CSV
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {error && (

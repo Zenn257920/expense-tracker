@@ -39,7 +39,7 @@ export async function getDashboardSummary(userId: string) {
     .groupBy(loanPayments.loanId)
     .as("payment_totals");
 
-  const [totals, monthlyResults, dailyResults, loanResults] = await Promise.all([
+  const [totals, monthlyResults, dailyResults, loanResults, categoryResults, loanPaymentResults] = await Promise.all([
     db.select({ type: categories.type, total: sum(transactions.amount) })
       .from(transactions)
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -78,6 +78,34 @@ export async function getDashboardSummary(userId: string) {
       .from(loans)
       .leftJoin(paymentTotals, eq(loans.id, paymentTotals.loanId))
       .where(eq(loans.userId, userId))
+      .groupBy(loans.type),
+    // Per-category totals for the current (Yangon) month.
+    db.select({
+      categoryName: categories.name,
+      type: categories.type,
+      total: sum(transactions.amount),
+    })
+      .from(transactions)
+      .innerJoin(categories, eq(transactions.categoryId, categories.id))
+      .where(and(
+        eq(transactions.userId, userId),
+        gte(transactions.transactionDate, startOfMonth),
+        lt(transactions.transactionDate, startOfTomorrow),
+      ))
+      .groupBy(categories.name, categories.type),
+    // Loan payments made/received in the current month. A payment on a
+    // borrowed loan is money out; on a lent loan it is money in.
+    db.select({
+      type: loans.type,
+      total: sum(loanPayments.amount),
+    })
+      .from(loanPayments)
+      .innerJoin(loans, eq(loanPayments.loanId, loans.id))
+      .where(and(
+        eq(loans.userId, userId),
+        gte(loanPayments.paymentDate, startOfMonth),
+        lt(loanPayments.paymentDate, startOfTomorrow),
+      ))
       .groupBy(loans.type),
   ]);
 
@@ -126,6 +154,21 @@ export async function getDashboardSummary(userId: string) {
     };
   });
 
+  let thisMonthIncome = 0n;
+  let thisMonthExpenses = 0n;
+  for (const values of dailyTotals.values()) {
+    thisMonthIncome += values.income;
+    thisMonthExpenses += values.expenses;
+  }
+
+  const categoryBreakdown = categoryResults
+    .map((item) => ({
+      categoryName: item.categoryName,
+      type: item.type as "income" | "expense",
+      total: formatAmount(toCents(item.total)),
+    }))
+    .sort((a, b) => Number(b.total) - Number(a.total));
+
   return {
     totalIncome: formatAmount(totalIncome),
     totalExpenses: formatAmount(totalExpenses),
@@ -134,5 +177,14 @@ export async function getDashboardSummary(userId: string) {
     ),
     monthlyTrend,
     dailyTrend,
+    thisMonthIncome: formatAmount(thisMonthIncome),
+    thisMonthExpenses: formatAmount(thisMonthExpenses),
+    categoryBreakdown,
+    loanRepaidThisMonth: formatAmount(toCents(
+      loanPaymentResults.find((item) => item.type === "borrowed")?.total ?? null,
+    )),
+    loanReceivedThisMonth: formatAmount(toCents(
+      loanPaymentResults.find((item) => item.type === "lent")?.total ?? null,
+    )),
   };
 }

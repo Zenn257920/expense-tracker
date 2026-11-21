@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import DashboardSkeleton from "@/components/dashboard/dashboard-skeleton";
+import CategoryBreakdown from "@/components/dashboard/category-breakdown";
 import SummaryCard from "@/components/dashboard/summary-card";
 import MonthlyOverview from "@/components/dashboard/monthly-overview";
+import AddTransactionDialog from "@/components/transactions/add-transaction-dialog";
+import { useCategories } from "@/hooks/use-categories";
 import type { DashboardSummary } from "@/types/dashboard";
 import { formatAmount } from "@/lib/format";
 import { api } from "@/lib/api";
@@ -29,6 +32,12 @@ export default function DashboardPage() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const {
+    categories,
+    isLoading: isLoadingCategories,
+    error: categoriesError,
+    refreshCategories,
+  } = useCategories();
 
   const refreshDashboard = useCallback(() => {
     setIsLoading(true);
@@ -99,14 +108,30 @@ export default function DashboardPage() {
     );
   }
 
+  const thisMonthNet =
+    Number(summary.thisMonthIncome) - Number(summary.thisMonthExpenses);
+
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:gap-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Your money at a glance.
+          </p>
+          <AddTransactionDialog
+            categories={categories}
+            isLoadingCategories={isLoadingCategories}
+            categoriesError={categoriesError}
+            onTransactionAdded={refreshDashboard}
+            onCategoriesChanged={refreshCategories}
+          />
+        </div>
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard
             title="Total Balance"
             amount={formatAmount(summary.balance) + " MMK"}
-            description="Includes outstanding borrowed and lent amounts"
+            description="Cash from transactions plus outstanding borrowed and lent amounts"
             icon="balance"
           />
 
@@ -124,6 +149,47 @@ export default function DashboardPage() {
             icon="expenses"
           />
         </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <SummaryCard
+            title="This month's income"
+            amount={formatAmount(summary.thisMonthIncome) + " MMK"}
+            description="Income recorded this month"
+            icon="income"
+          />
+
+          <SummaryCard
+            title="This month's expenses"
+            amount={formatAmount(summary.thisMonthExpenses) + " MMK"}
+            description="Expenses recorded this month"
+            icon="expenses"
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>This month&apos;s balance</CardTitle>
+              <CardDescription>
+                Income minus expenses this month
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatAmount(thisMonthNet)} MMK
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Loan repayments paid: {formatAmount(summary.loanRepaidThisMonth)} MMK
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Loan repayments received: {formatAmount(summary.loanReceivedThisMonth)} MMK
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Loan payments are shown separately; they are not transactions.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+
+        <CategoryBreakdown breakdown={summary.categoryBreakdown} />
 
         <MonthlyOverview
           monthlyData={summary.monthlyTrend}

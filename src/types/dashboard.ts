@@ -16,6 +16,21 @@ export interface DashboardSummary {
   balance: string;
   monthlyTrend: MonthlyTrendPoint[];
   dailyTrend: DailyTrendPoint[];
+  /** This month (Yangon) totals, for the "This month" section. */
+  thisMonthIncome: string;
+  thisMonthExpenses: string;
+  /** Per-category totals for the current month, largest first. */
+  categoryBreakdown: CategoryBreakdownPoint[];
+  /** Loan cash flow in the current month. Kept separate from transactions
+   * (and from the balance formula) so nothing is double-counted. */
+  loanRepaidThisMonth: string;
+  loanReceivedThisMonth: string;
+}
+
+export interface CategoryBreakdownPoint {
+  categoryName: string;
+  type: TransactionType;
+  total: string;
 }
 
 export interface MonthlyTrendPoint {
