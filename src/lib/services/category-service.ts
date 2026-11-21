@@ -3,7 +3,22 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { ApiError } from "@/lib/api-error";
+import { DEFAULT_CATEGORIES } from "@/lib/default-categories";
 import type { TransactionType } from "@/types/dashboard";
+
+/**
+ * Create the starter categories for a user. Safe to call repeatedly:
+ * existing (user, name, type) rows are skipped, so it never duplicates
+ * and never fails a signup if the categories already exist.
+ */
+export async function ensureDefaultCategories(userId: string) {
+  await db
+    .insert(categories)
+    .values(
+      DEFAULT_CATEGORIES.map((category) => ({ userId, ...category })),
+    )
+    .onConflictDoNothing();
+}
 
 type CategoryInput = Record<string, unknown>;
 

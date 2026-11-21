@@ -23,6 +23,7 @@ export default function TransactionsPage() {
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState("");
@@ -62,7 +63,10 @@ export default function TransactionsPage() {
           setError(getApiErrorMessage(err, "Could not load transactions."));
         }
       } finally {
-        if (isActive) setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+          setHasLoaded(true);
+        }
       }
     }
 
@@ -79,7 +83,10 @@ export default function TransactionsPage() {
     setRefreshKey((key) => key + 1);
   }, []);
 
-  if (isLoading) {
+  // Full skeleton only on the very first load. Later refreshes (add/edit/
+  // delete, search, tab change) keep the list visible instead of flashing
+  // the whole page white; the list shows its own loading state.
+  if (isLoading && !hasLoaded) {
     return <TransactionsSkeleton />;
   }
 

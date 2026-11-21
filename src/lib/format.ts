@@ -5,7 +5,7 @@ const moneyFormatter = new Intl.NumberFormat("en-US", {
 });
 
 const amountFormatter = new Intl.NumberFormat("en-US", {
-  useGrouping: false,
+  useGrouping: true,
   maximumFractionDigits: 2,
 });
 

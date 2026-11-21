@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import axios from "axios";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 import { useCategories } from "@/hooks/use-categories";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
+import { DEFAULT_CATEGORIES } from "@/lib/default-categories";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -122,6 +124,32 @@ export default function CategoriesPage() {
       toast.success("Category updated successfully.");
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not update category."));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleAddStarterCategories() {
+    setError("");
+    setIsSaving(true);
+    try {
+      // Existing accounts have no categories: create the starter set
+      // one by one through the normal create endpoint (duplicates 409
+      // and are skipped, so this is safe to tap more than once).
+      for (const category of DEFAULT_CATEGORIES) {
+        try {
+          await api.createCategory(category);
+        } catch (err) {
+          // 409 = that category already exists; skip it and keep going.
+          if (!(axios.isAxiosError(err) && err.response?.status === 409)) {
+            throw err;
+          }
+        }
+      }
+      await refreshCategories();
+      toast.success("Starter categories added.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not add starter categories."));
     } finally {
       setIsSaving(false);
     }
@@ -240,9 +268,29 @@ export default function CategoriesPage() {
                 <EmptyHeader>
                   <EmptyTitle>No categories yet</EmptyTitle>
                   <EmptyDescription>
-                    Add a category above to get started.
+                    Add a category above, or add the starter set
+                    (Food, Transport, Bills, Salary and more) in one tap.
                   </EmptyDescription>
                 </EmptyHeader>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  disabled={isSaving}
+                  onClick={handleAddStarterCategories}
+                >
+                  {isSaving ? (
+                    <>
+                      <Spinner data-icon="inline-start" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Plus data-icon="inline-start" />
+                      Add starter categories
+                    </>
+                  )}
+                </Button>
               </Empty>
             ) : (
               <ul className="flex flex-col gap-3">

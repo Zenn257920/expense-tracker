@@ -7,6 +7,7 @@ import * as schema from "@/db/schema";
 import { loans, loanPayments } from "@/db/schema";
 import { ApiError } from "@/lib/api-error";
 import { getLoanStatus } from "@/lib/loan-status";
+import { getYangonDateString } from "@/lib/yangon-date";
 import { isValidDate, isValidLoanAmount } from "@/lib/validation";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -56,7 +57,7 @@ async function getLoanPaymentSummary(tx: Parameters<Parameters<typeof paymentDb.
   ]);
   const paidAmount = Number(paymentTotal[0]?.paidAmount ?? 0);
   const remainingAmount = Math.max(0, Number(loan.amount) - paidAmount);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getYangonDateString();
   const status = getLoanStatus(remainingAmount, paidAmount, loan.dueDate, today);
   return {
     id: loan.id,

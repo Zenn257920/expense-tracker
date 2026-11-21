@@ -176,8 +176,9 @@ export default function RecentTransactions({
             </EmptyHeader>
           </Empty>
         ) : (
-          <Table>
-            <TableHeader>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table className="min-w-[640px]">
+              <TableHeader>
               <TableRow>
                 <TableHead>Description</TableHead>
                 <TableHead>Category</TableHead>
@@ -363,7 +364,8 @@ export default function RecentTransactions({
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         )}
       </CardContent>
 

@@ -3,6 +3,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { ensureDefaultCategories } from "@/lib/services/category-service";
 
 const baseURL =
   process.env.BETTER_AUTH_URL ??
@@ -20,6 +21,22 @@ export const auth = betterAuth({
     },
   }),
   emailAndPassword: { enabled: true, autoSignIn: false },
+  databaseHooks: {
+    user: {
+      create: {
+        // New accounts start with starter categories (Food, Transport,
+        // Salary, ...) so the first transaction can be added right away.
+        // Seeding must never block signup, so failures are only logged.
+        after: async (user) => {
+          try {
+            await ensureDefaultCategories(user.id);
+          } catch (error) {
+            console.error("[seed default categories]", error);
+          }
+        },
+      },
+    },
+  },
   onAPIError: {
     onError(error) {
       if (process.env.NODE_ENV !== "production") {

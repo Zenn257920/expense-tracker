@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { loans, loanPayments } from "@/db/schema";
 import { ApiError } from "@/lib/api-error";
 import { getLoanStatus } from "@/lib/loan-status";
+import { getYangonDateString } from "@/lib/yangon-date";
 import { isValidLoanAmount } from "@/lib/validation";
 
 const createLoanSchema = z
@@ -100,7 +101,7 @@ export async function listLoans(userId: string) {
       Number(payment.paidAmount ?? 0),
     ]),
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getYangonDateString();
 
   const data = userLoans.map((loan) => {
     const paidAmount = paymentsByLoanId.get(loan.id) ?? 0;

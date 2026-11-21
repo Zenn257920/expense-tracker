@@ -2,6 +2,10 @@ import { and, eq, gte, lt, sql, sum } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories, loans, loanPayments, transactions } from "@/db/schema";
+import {
+  getYangonParts,
+  toDateString,
+} from "@/lib/yangon-date";
 
 function toCents(value: string | null) {
   if (!value) return 0n;
@@ -18,14 +22,13 @@ function formatAmount(cents: bigint) {
 }
 
 export async function getDashboardSummary(userId: string) {
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
-  const startOfMonth = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
-  const startOfTomorrow = new Date(Date.UTC(year, month, now.getUTCDate() + 1)).toISOString().slice(0, 10);
+  // Month boundaries are Yangon calendar dates, not UTC (see yangon-date).
+  const { year, month, day } = getYangonParts();
+  const startOfMonth = toDateString(year, month, 1);
+  const startOfTomorrow = toDateString(year, month, day + 1);
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
-  const startOfTrend = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)).toISOString().slice(0, 10);
+  const startOfNextMonth = toDateString(year, month + 1, 1);
+  const startOfTrend = toDateString(year, month - 5, 1);
 
   const paymentTotals = db
     .select({
@@ -96,7 +99,7 @@ export async function getDashboardSummary(userId: string) {
   }
 
   const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + index, 1));
+    const date = new Date(Date.UTC(year, month - 5 + index, 1));
     const key = date.toISOString().slice(0, 7);
     const values = trend.get(key) ?? { income: 0n, expenses: 0n };
     return {
@@ -114,7 +117,7 @@ export async function getDashboardSummary(userId: string) {
     dailyTotals.set(item.date, values);
   }
   const dailyTrend = Array.from({ length: daysInMonth }, (_, index) => {
-    const date = new Date(Date.UTC(year, month, index + 1)).toISOString().slice(0, 10);
+    const date = toDateString(year, month, index + 1);
     const values = dailyTotals.get(date) ?? { income: 0n, expenses: 0n };
     return {
       date,

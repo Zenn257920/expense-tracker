@@ -1,3 +1,4 @@
+import { getYangonParts, toDateString } from "@/lib/yangon-date";
 import type { Loan } from "@/types/loan";
 
 export interface LoanOverview {
@@ -9,20 +10,15 @@ export interface LoanOverview {
   overdueLoans: Loan[];
 }
 
-function utcDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
 function remainingBalance(loan: Loan) {
   return Math.max(0, loan.remainingAmount);
 }
 
 export function calculateLoanOverview(loans: Loan[], now = new Date()): LoanOverview {
-  const today = utcDateKey(now);
-  const nextWeek = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 7),
-  );
-  const nextWeekKey = utcDateKey(nextWeek);
+  // "Today" and "next week" are Yangon calendar dates, not UTC.
+  const { year, month, day } = getYangonParts(now);
+  const today = toDateString(year, month, day);
+  const nextWeekKey = toDateString(year, month, day + 7);
 
   const overdueLoans = loans
     .filter((loan) => remainingBalance(loan) > 0 && loan.dueDate.slice(0, 10) < today)

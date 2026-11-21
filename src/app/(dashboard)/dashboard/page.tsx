@@ -26,6 +26,7 @@ import {
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -51,7 +52,10 @@ export default function DashboardPage() {
           setError(getApiErrorMessage(err, "Could not load dashboard data."));
         }
       } finally {
-        if (isActive) setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+          setHasLoaded(true);
+        }
       }
     }
 
@@ -62,7 +66,9 @@ export default function DashboardPage() {
     };
   }, [refreshKey]);
 
-  if (isLoading) {
+  // Full skeleton only on the very first load; a later refresh keeps the
+  // loaded dashboard visible instead of flashing the whole page white.
+  if (isLoading && !hasLoaded) {
     return <DashboardSkeleton />;
   }
 
