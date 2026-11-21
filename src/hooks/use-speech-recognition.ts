@@ -81,7 +81,11 @@ function getRecognitionErrorMessage(code: string) {
     case "no-speech":
       return "No speech was recognized. Please try again.";
     case "network":
-      return "Speech recognition needs a network connection. Please try again.";
+      // This is the error Chrome reports when its speech service can't be
+      // reached — most often in an in-app browser / WebView, or on a slow
+      // connection — even though the page itself loaded fine. It is not
+      // the user's Wi-Fi failing, so say what to do instead.
+      return "Speech recognition couldn't reach its service in this browser. Open this site in the Chrome app and try again, or type the transaction below instead.";
     default:
       return "Unable to recognize your speech. Please try again.";
   }

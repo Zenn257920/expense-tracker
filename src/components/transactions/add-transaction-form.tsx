@@ -116,6 +116,7 @@ export default function AddTransactionForm({
   } = useSpeechRecognition(voiceLang, handleVoiceTranscript);
 
   const [triedExample, setTriedExample] = useState("");
+  const [typedPhrase, setTypedPhrase] = useState("");
   const shownTranscript = transcript || triedExample;
 
   function handleTryExample(example: string) {
@@ -123,6 +124,12 @@ export default function AddTransactionForm({
     // and for checking how a phrase will be understood before speaking it.
     setTriedExample(example);
     handleVoiceTranscript(example);
+  }
+
+  function handleParseTypedPhrase() {
+    const phrase = typedPhrase.trim();
+    if (!phrase || isListening) return;
+    handleTryExample(phrase);
   }
 
   function handleVoiceLangChange(nextLang: "en-US" | "my-MM") {
@@ -158,6 +165,7 @@ export default function AddTransactionForm({
 
   function handleClearVoiceInput() {
     setTriedExample("");
+    setTypedPhrase("");
     resetTranscript();
     setVoiceResult(null);
   }
@@ -302,6 +310,41 @@ export default function AddTransactionForm({
 
         {speechError && <FieldError>{speechError}</FieldError>}
 
+        {!isListening && (
+          <div className="flex flex-col gap-2 border-t pt-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Or type what you would say — no microphone needed:
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={typedPhrase}
+                onChange={(event) => setTypedPhrase(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleParseTypedPhrase();
+                  }
+                }}
+                placeholder={
+                  voiceLang === "my-MM"
+                    ? "ဥပမာ: နေ့လည်စာ ငါးထောင် သုံးတယ်"
+                    : "e.g. Spent 5000 on lunch"
+                }
+                aria-label="Type your transaction"
+                maxLength={500}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleParseTypedPhrase}
+                disabled={!typedPhrase.trim() || isSubmitting}
+              >
+                Parse
+              </Button>
+            </div>
+          </div>
+        )}
+
         {!isListening && !shownTranscript && (
           <div className="flex flex-col gap-2 border-t pt-3">
             <p className="text-xs font-medium text-muted-foreground">
@@ -323,7 +366,13 @@ export default function AddTransactionForm({
             {voiceLang === "my-MM" && (
               <p className="text-xs text-muted-foreground">
                 Burmese recognition depends on Chrome — if it mishears, switch
-                to English above.
+                to English above, or type it instead.
+              </p>
+            )}
+            {voiceLang === "en-US" && (
+              <p className="text-xs text-muted-foreground">
+                Voice works best in the Chrome app — in an in-app browser it
+                often fails. Typing works everywhere.
               </p>
             )}
           </div>
