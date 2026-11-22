@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import * as schema from "@/db/schema";
@@ -44,6 +45,16 @@ export const auth = betterAuth({
         // Salary, ...) so the first transaction can be added right away.
         // Seeding must never block signup, so failures are only logged.
         after: async (user) => {
+          try {
+            // Creation is only reachable after OTP verification (see the
+            // before hook), so the email is verified from day one.
+            await db
+              .update(schema.user)
+              .set({ emailVerified: true })
+              .where(eq(schema.user.id, user.id));
+          } catch (error) {
+            console.error("[mark email verified]", error);
+          }
           try {
             await consumeSignupVerification(user.email);
           } catch (error) {

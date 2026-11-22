@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -44,6 +44,69 @@ export function SettingsForm({ user }: SettingsFormProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  // Email verification for accounts created before OTP sign-up existed.
+  const [isEmailVerified, setIsEmailVerified] = useState(user.emailVerified);
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  async function postEmailOtp(path: string, body?: Record<string, string>) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+    const data: { message?: string } = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message ?? "Something went wrong. Please try again.");
+    }
+  }
+
+  async function handleSendVerificationCode() {
+    setVerifyError("");
+    setIsSendingCode(true);
+    try {
+      await postEmailOtp("/api/auth/send-my-email-otp");
+      setIsCodeSent(true);
+      setResendIn(60);
+      toast.success("Verification code sent. Check your email.");
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Could not send the code.");
+    } finally {
+      setIsSendingCode(false);
+    }
+  }
+
+  async function handleVerifyEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setVerifyError("Enter the 6-digit code.");
+      return;
+    }
+    setVerifyError("");
+    setIsVerifying(true);
+    try {
+      await postEmailOtp("/api/auth/verify-my-email", { otp: otp.trim() });
+      setIsEmailVerified(true);
+      setIsCodeSent(false);
+      setOtp("");
+      toast.success("Your email is verified.");
+      router.refresh();
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Could not verify the code.");
+    } finally {
+      setIsVerifying(false);
+    }
+  }
 
   async function handleNameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,7 +205,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
               <p className="text-sm text-muted-foreground">Email</p>
               <p className="mt-1 font-medium">{user.email}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {user.emailVerified ? "Verified" : "Not verified"}
+                {isEmailVerified ? "Verified" : "Not verified"}
               </p>
             </div>
           </div>
@@ -197,6 +260,66 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 </Button>
               </div>
             </form>
+          )}
+
+          {!isEmailVerified && (
+            <div className="flex flex-col gap-3 rounded-xl border p-4">
+              <div>
+                <p className="font-medium">Verify your email</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {isCodeSent
+                    ? `We sent a 6-digit code to ${user.email}. Enter it below.`
+                    : "Confirm this email belongs to you. We will send a 6-digit code to it."}
+                </p>
+              </div>
+              {!isCodeSent ? (
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSendingCode}
+                    onClick={handleSendVerificationCode}
+                  >
+                    {isSendingCode && <Spinner data-icon="inline-start" />}
+                    {isSendingCode ? "Sending..." : "Send verification code"}
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleVerifyEmail} className="flex flex-col gap-3">
+                  <Field>
+                    <FieldLabel htmlFor="settings-otp">Verification code</FieldLabel>
+                    <Input
+                      id="settings-otp"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      maxLength={6}
+                      value={otp}
+                      onChange={(event) =>
+                        setOtp(event.target.value.replaceAll(/\D/g, "").slice(0, 6))
+                      }
+                      required
+                    />
+                  </Field>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" variant="outline" disabled={isVerifying}>
+                      {isVerifying && <Spinner data-icon="inline-start" />}
+                      {isVerifying ? "Verifying..." : "Verify email"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={isSendingCode || resendIn > 0}
+                      onClick={handleSendVerificationCode}
+                    >
+                      {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}
+                    </Button>
+                  </div>
+                </form>
+              )}
+              {verifyError && <FieldError>{verifyError}</FieldError>}
+            </div>
           )}
         </CardContent>
       </Card>
