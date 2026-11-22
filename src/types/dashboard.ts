@@ -25,6 +25,9 @@ export interface DashboardSummary {
    * (and from the balance formula) so nothing is double-counted. */
   loanRepaidThisMonth: string;
   loanReceivedThisMonth: string;
+  /** Outstanding loan balances (already inside the balance formula). */
+  borrowedRemaining: string;
+  lentRemaining: string;
 }
 
 export interface CategoryBreakdownPoint {

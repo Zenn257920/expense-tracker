@@ -14,26 +14,32 @@ import {
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { getApiErrorMessage } from "@/lib/api-client";
 import { Plus } from "lucide-react";
 
+// Interest rate is intentionally not collected: it is stored but never
+// calculated anywhere, and the server defaults it to 0 when omitted.
+type NewLoanInput = Omit<CreateLoanInput, "interestRate">;
+
 interface AddLoanDialogProps {
-  onAdd: (data: CreateLoanInput) => Promise<void>;
+  onAdd: (data: NewLoanInput) => Promise<void>;
 }
 
 export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<CreateLoanInput>({
+  const [formData, setFormData] = useState<NewLoanInput>({
     personName: "",
     type: "borrowed",
     amount: 0,
     borrowedDate: new Date().toISOString().slice(0, 10),
     dueDate: "",
-    interestRate: 0,
     description: "",
   });
 
@@ -41,14 +47,17 @@ export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
     e.preventDefault();
 
     if (formData.amount <= 0) {
+      setFormError("Enter an amount greater than zero.");
       return;
     }
 
     if (formData.dueDate < formData.borrowedDate) {
+      setFormError("Due date must be on or after the start date.");
       return;
     }
 
     setIsSaving(true);
+    setFormError(null);
     try {
       await onAdd(formData);
       setFormData({
@@ -57,24 +66,29 @@ export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
         amount: 0,
         borrowedDate: new Date().toISOString().slice(0, 10),
         dueDate: "",
-        interestRate: 0,
         description: "",
       });
       setOpen(false);
-    } catch {
-      // The page displays the API error and leaves the form open for correction or retry.
+    } catch (err) {
+      setFormError(getApiErrorMessage(err, "Could not add loan."));
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) setFormError(null);
+        setOpen(isOpen);
+      }}
+    >
       <DialogTrigger
         render={
           <Button type="button" variant="outline">
             <Plus className="mr-2 size-4" />
-            Add Loan
+            Add loan
           </Button>
         }
       />
@@ -137,7 +151,7 @@ export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
           </div>
 
           {/* Amount */}
-          <div className="col-span-2 space-y-1 sm:col-span-1">
+          <div className="col-span-2 space-y-1">
             <Label htmlFor="amount">Amount (MMK)</Label>
 
             <Input
@@ -153,26 +167,6 @@ export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
                 setFormData({
                   ...formData,
                   amount: Number(e.target.value),
-                })
-              }
-            />
-          </div>
-
-          {/* Interest Rate */}
-          <div className="col-span-2 space-y-1 sm:col-span-1">
-            <Label htmlFor="interestRate">Interest Rate (% per year)</Label>
-
-            <Input
-              id="interestRate"
-              className="h-9"
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.interestRate}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  interestRate: Number(e.target.value),
                 })
               }
             />
@@ -236,13 +230,19 @@ export default function AddLoanDialog({ onAdd }: AddLoanDialogProps) {
             />
           </div>
 
+          {formError && (
+            <div className="col-span-2">
+              <FieldError>{formError}</FieldError>
+            </div>
+          )}
+
           <Button
             type="submit"
             className="sticky bottom-0 col-span-2 w-full"
             disabled={isSaving}
             variant="outline"
           >
-            {isSaving ? "Saving..." : "Save Loan"}
+            {isSaving ? "Saving..." : "Add loan"}
           </Button>
         </form>
       </DialogContent>

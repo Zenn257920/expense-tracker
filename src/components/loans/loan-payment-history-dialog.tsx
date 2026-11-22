@@ -48,6 +48,8 @@ import type { Loan } from "@/types/loan";
 interface LoanPaymentHistoryDialogProps {
   loan: Loan;
   onChanged: () => void;
+  /** Extra classes for the trigger button (e.g. full-width on mobile cards). */
+  className?: string;
 }
 
 interface EditPaymentForm {
@@ -66,6 +68,7 @@ function formatDate(value: string) {
 export default function LoanPaymentHistoryDialog({
   loan,
   onChanged,
+  className,
 }: LoanPaymentHistoryDialogProps) {
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<Awaited<
@@ -188,7 +191,12 @@ export default function LoanPaymentHistoryDialog({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger
           render={
-            <Button type="button" variant="outline" size="sm">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={className}
+            >
               Payment History
             </Button>
           }

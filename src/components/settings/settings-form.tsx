@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,12 +54,26 @@ export function SettingsForm({ user }: SettingsFormProps) {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  // The verification code expires 10 minutes after it is sent.
+  const [otpExpiresIn, setOtpExpiresIn] = useState(0);
+  const otpSubmittingRef = useRef(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   useEffect(() => {
     if (resendIn <= 0) return;
     const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendIn]);
+
+  useEffect(() => {
+    if (otpExpiresIn <= 0) return;
+    const timer = setTimeout(
+      () => setOtpExpiresIn((value) => value - 1),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [otpExpiresIn]);
 
   async function postEmailOtp(path: string, body?: Record<string, string>) {
     const response = await fetch(path, {
@@ -78,11 +94,32 @@ export function SettingsForm({ user }: SettingsFormProps) {
       await postEmailOtp("/api/auth/send-my-email-otp");
       setIsCodeSent(true);
       setResendIn(60);
+      setOtpExpiresIn(600);
       toast.success("Verification code sent. Check your email.");
     } catch (err) {
       setVerifyError(err instanceof Error ? err.message : "Could not send the code.");
     } finally {
       setIsSendingCode(false);
+    }
+  }
+
+  async function submitVerifyEmail(code: string) {
+    if (!/^\d{6}$/.test(code) || otpSubmittingRef.current) return;
+    otpSubmittingRef.current = true;
+    setVerifyError("");
+    setIsVerifying(true);
+    try {
+      await postEmailOtp("/api/auth/verify-my-email", { otp: code });
+      setIsEmailVerified(true);
+      setIsCodeSent(false);
+      setOtp("");
+      toast.success("Your email is verified.");
+      router.refresh();
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Could not verify the code.");
+    } finally {
+      otpSubmittingRef.current = false;
+      setIsVerifying(false);
     }
   }
 
@@ -92,19 +129,28 @@ export function SettingsForm({ user }: SettingsFormProps) {
       setVerifyError("Enter the 6-digit code.");
       return;
     }
-    setVerifyError("");
-    setIsVerifying(true);
+    await submitVerifyEmail(otp.trim());
+  }
+
+  async function handleSignOut() {
+    if (!confirmSignOut) {
+      setConfirmSignOut(true);
+      return;
+    }
+    setIsSigningOut(true);
     try {
-      await postEmailOtp("/api/auth/verify-my-email", { otp: otp.trim() });
-      setIsEmailVerified(true);
-      setIsCodeSent(false);
-      setOtp("");
-      toast.success("Your email is verified.");
+      const result = await authClient.signOut();
+      if (result.error) {
+        toast.error(result.error.message ?? "Could not sign out. Please try again.");
+        return;
+      }
+      toast.success("Signed out successfully.");
+      router.replace("/login");
       router.refresh();
-    } catch (err) {
-      setVerifyError(err instanceof Error ? err.message : "Could not verify the code.");
+    } catch {
+      toast.error("Could not sign out. Please try again.");
     } finally {
-      setIsVerifying(false);
+      setIsSigningOut(false);
     }
   }
 
@@ -204,9 +250,20 @@ export function SettingsForm({ user }: SettingsFormProps) {
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
               <p className="mt-1 font-medium">{user.email}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {isEmailVerified ? "Verified" : "Not verified"}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {isEmailVerified ? (
+                  <Badge className="bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                    Verified
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                    Not verified
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  Verified email is used for account recovery.
+                </span>
+              </div>
             </div>
           </div>
 
@@ -244,7 +301,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" disabled={isSavingName} variant="outline">
                   {isSavingName && <Spinner data-icon="inline-start" />}
-                  {isSavingName ? "Saving..." : "Save name"}
+                  {isSavingName ? "Saving..." : "Save changes"}
                 </Button>
                 <Button
                   type="button"
@@ -296,11 +353,21 @@ export function SettingsForm({ user }: SettingsFormProps) {
                       placeholder="123456"
                       maxLength={6}
                       value={otp}
-                      onChange={(event) =>
-                        setOtp(event.target.value.replaceAll(/\D/g, "").slice(0, 6))
-                      }
+                      onChange={(event) => {
+                        const next = event.target.value
+                          .replaceAll(/\D/g, "")
+                          .slice(0, 6);
+                        setOtp(next);
+                        // Auto-submit once the 6th digit is entered.
+                        if (next.length === 6) void submitVerifyEmail(next);
+                      }}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {otpExpiresIn > 0
+                        ? `Code expires in ${formatCountdown(otpExpiresIn)}`
+                        : "This code has expired. Request a new one below."}
+                    </p>
                   </Field>
                   <div className="flex flex-wrap gap-2">
                     <Button type="submit" variant="outline" disabled={isVerifying}>
@@ -365,6 +432,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                   value={newPassword}
                   onChange={setNewPassword}
                   autoComplete="new-password"
+                  helper="At least 8 characters"
                 />
                 <PasswordField
                   id="confirm-password"
@@ -372,6 +440,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                   value={confirmPassword}
                   onChange={setConfirmPassword}
                   autoComplete="new-password"
+                  helper="At least 8 characters"
                 />
               </FieldGroup>
 
@@ -384,7 +453,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                   variant="outline"
                 >
                   {isSavingPassword && <Spinner data-icon="inline-start" />}
-                  {isSavingPassword ? "Updating..." : "Save new password"}
+                  {isSavingPassword ? "Updating..." : "Save changes"}
                 </Button>
                 <Button
                   type="button"
@@ -405,8 +474,39 @@ export function SettingsForm({ user }: SettingsFormProps) {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sign out</CardTitle>
+          <CardDescription>
+            Sign out of MyFinance on this device. You can sign back in at
+            any time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant={confirmSignOut ? "destructive" : "outline"}
+            disabled={isSigningOut}
+            onClick={handleSignOut}
+          >
+            {isSigningOut && <Spinner data-icon="inline-start" />}
+            {isSigningOut
+              ? "Signing out..."
+              : confirmSignOut
+                ? "Tap again to confirm sign out"
+                : "Sign out"}
+          </Button>
+        </CardContent>
+      </Card>
     </>
   );
+}
+
+function formatCountdown(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 interface PasswordFieldProps {
@@ -415,6 +515,7 @@ interface PasswordFieldProps {
   value: string;
   onChange: (value: string) => void;
   autoComplete: "current-password" | "new-password";
+  helper?: string;
 }
 
 function PasswordField({
@@ -423,19 +524,36 @@ function PasswordField({
   value,
   onChange,
   autoComplete,
+  helper,
 }: PasswordFieldProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input
-        id={id}
-        type="password"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={autoComplete}
-        minLength={8}
-        required
-      />
+      <div className="relative">
+        <Input
+          id={id}
+          type={isVisible ? "text" : "password"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          minLength={8}
+          required
+          className="pr-10"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-1/2 right-1 -translate-y-1/2"
+          onClick={() => setIsVisible((visible) => !visible)}
+          aria-label={isVisible ? "Hide password" : "Show password"}
+        >
+          {isVisible ? <EyeOff /> : <Eye />}
+        </Button>
+      </div>
+      {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
     </Field>
   );
 }

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth-client";
@@ -41,12 +42,27 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [step, setStep] = useState<"details" | "otp">("details");
   const [otp, setOtp] = useState("");
   const [resendIn, setResendIn] = useState(0);
+  // The OTP code expires 10 minutes after it is sent.
+  const [otpExpiresIn, setOtpExpiresIn] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const otpSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (resendIn <= 0) return;
     const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendIn]);
+
+  useEffect(() => {
+    if (otpExpiresIn <= 0) return;
+    const timer = setTimeout(
+      () => setOtpExpiresIn((value) => value - 1),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [otpExpiresIn]);
 
   async function postOtp(path: string, body: Record<string, string>) {
     const response = await fetch(path, {
@@ -98,6 +114,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
           return;
         }
         setResendIn(60);
+        setOtpExpiresIn(600);
         setStep("otp");
         toast.success("Verification code sent. Check your email.");
         return;
@@ -124,20 +141,17 @@ export default function AuthForm({ mode }: AuthFormProps) {
     }
   }
 
-  async function handleOtpSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!/^\d{6}$/.test(otp.trim())) {
-      setError("Enter the 6-digit code.");
-      return;
-    }
+  async function submitOtp(code: string) {
+    if (!/^\d{6}$/.test(code) || otpSubmittingRef.current) return;
+    otpSubmittingRef.current = true;
     setError("");
     setIsSubmitting(true);
     try {
-      // Step 2: verify the code, then create the account. The server
-      // refuses sign-up while the email is not verified.
+      // Verify the code, then create the account. The server refuses
+      // sign-up while the email is not verified.
       await postOtp("/api/auth/verify-signup-otp", {
         email: email.trim(),
-        otp: otp.trim(),
+        otp: code,
       });
       const result = await authClient.signUp.email({
         name: name.trim(),
@@ -148,28 +162,52 @@ export default function AuthForm({ mode }: AuthFormProps) {
         setError(result.error.message ?? "Could not create your account.");
         return;
       }
-      toast.success("Account created successfully. Please sign in.");
-      router.replace("/login");
+      // autoSignIn is off, so sign up returns no session. Sign in with
+      // the credentials just used so the new user lands on the
+      // dashboard instead of having to sign in again.
+      const signIn = await authClient.signIn.email({
+        email: email.trim(),
+        password,
+      });
+      if (signIn.error) {
+        toast.success("Account created successfully. Please sign in.");
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+      toast.success("Account created successfully.");
+      router.replace("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not verify the code.");
     } finally {
+      otpSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   }
 
+  async function handleOtpSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError("Enter the 6-digit code.");
+      return;
+    }
+    await submitOtp(otp.trim());
+  }
+
   async function handleResend() {
-    if (resendIn > 0) return;
+    if (resendIn > 0 || isResending) return;
     setError("");
-    setIsSubmitting(true);
+    setIsResending(true);
     try {
       await postOtp("/api/auth/send-signup-otp", { email: email.trim() });
       setResendIn(60);
+      setOtpExpiresIn(600);
       toast.success("A new code was sent to your email.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not resend the code.");
     } finally {
-      setIsSubmitting(false);
+      setIsResending(false);
     }
   }
 
@@ -188,11 +226,28 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 : "Welcome back"}
           </CardTitle>
           <CardDescription>
-            {isRegister && step === "otp"
-              ? `We sent a 6-digit code to ${email.trim()}. Enter it below to verify your email, then your account will be created.`
-              : isRegister
-                ? "Start managing your personal finances."
-                : "Sign in to continue to your dashboard."}
+            {isRegister && step === "otp" ? (
+              <>
+                {`We sent a 6-digit code to ${email.trim()}. Enter it below to verify your email, then your account will be created.`}
+                <span className="block">
+                  ပို့ထားတဲ့ ၆ လုံးကုဒ်ကို အောက်မှာ ရိုက်ထည့်ပါ။
+                </span>
+              </>
+            ) : isRegister ? (
+              <>
+                Start managing your personal finances.
+                <span className="block">
+                  ကိုယ်ပိုင်ငွေစာရင်းကို စတင်စီမံပါ။
+                </span>
+              </>
+            ) : (
+              <>
+                Sign in to continue to your dashboard.
+                <span className="block">
+                  သင့်ငွေစာရင်းကို ဆက်ကြည့်ရန် ဝင်ရောက်ပါ။
+                </span>
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -213,11 +268,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
                     placeholder="123456"
                     maxLength={6}
                     value={otp}
-                    onChange={(event) =>
-                      setOtp(event.target.value.replaceAll(/\D/g, "").slice(0, 6))
-                    }
+                    onChange={(event) => {
+                      const next = event.target.value
+                        .replaceAll(/\D/g, "")
+                        .slice(0, 6);
+                      setOtp(next);
+                      // Auto-submit once the 6th digit is entered.
+                      if (next.length === 6) void submitOtp(next);
+                    }}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {otpExpiresIn > 0
+                      ? `Code expires in ${formatCountdown(otpExpiresIn)}`
+                      : "This code has expired. Request a new one below."}
+                  </p>
                 </Field>
               </FieldGroup>
               {error && <FieldError>{error}</FieldError>}
@@ -242,10 +307,14 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={isSubmitting || resendIn > 0}
+                  disabled={isResending || resendIn > 0}
                   onClick={handleResend}
                 >
-                  {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}
+                  {isResending
+                    ? "Sending..."
+                    : resendIn > 0
+                      ? `Resend code (${resendIn}s)`
+                      : "Resend code"}
                 </Button>
               </div>
             </form>
@@ -281,6 +350,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 onChange={setPassword}
                 autoComplete={isRegister ? "new-password" : "current-password"}
                 error={fieldErrors.password}
+                helper={isRegister ? "At least 8 characters" : undefined}
+                isPasswordVisible={showPassword}
+                onToggleVisibility={() => setShowPassword((value) => !value)}
               />
               {isRegister && (
                 <AuthField
@@ -290,9 +362,24 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   onChange={setConfirmPassword}
                   autoComplete="new-password"
                   error={fieldErrors.confirmPassword}
+                  helper="At least 8 characters"
+                  isPasswordVisible={showConfirmPassword}
+                  onToggleVisibility={() =>
+                    setShowConfirmPassword((value) => !value)
+                  }
                 />
               )}
             </FieldGroup>
+            {!isRegister && (
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
             {error && <FieldError>{error}</FieldError>}
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting && <Spinner data-icon="inline-start" />}
@@ -319,6 +406,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
   );
 }
 
+function formatCountdown(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function AuthField({
   label,
   type,
@@ -326,6 +419,9 @@ function AuthField({
   onChange,
   autoComplete,
   error,
+  helper,
+  isPasswordVisible,
+  onToggleVisibility,
 }: {
   label: string;
   type: string;
@@ -333,23 +429,53 @@ function AuthField({
   onChange: (value: string) => void;
   autoComplete: string;
   error?: string;
+  helper?: string;
+  isPasswordVisible?: boolean;
+  onToggleVisibility?: () => void;
 }) {
   const fieldId = `auth-${label.toLowerCase().replaceAll(" ", "-")}`;
+  const inputType =
+    type === "password" && isPasswordVisible !== undefined
+      ? isPasswordVisible
+        ? "text"
+        : "password"
+      : type;
 
   return (
     <Field data-invalid={Boolean(error)}>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <Input
-        id={fieldId}
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={autoComplete}
-        required
-        minLength={type === "password" ? 8 : undefined}
-        aria-invalid={Boolean(error)}
-      />
-      {error && <FieldError>{error}</FieldError>}
+      <div className="relative">
+        <Input
+          id={fieldId}
+          type={inputType}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          required
+          minLength={type === "password" ? 8 : undefined}
+          aria-invalid={Boolean(error)}
+          className={onToggleVisibility ? "pr-10" : undefined}
+        />
+        {onToggleVisibility && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute top-1/2 right-1 -translate-y-1/2"
+            onClick={onToggleVisibility}
+            aria-label={
+              isPasswordVisible ? "Hide password" : "Show password"
+            }
+          >
+            {isPasswordVisible ? <EyeOff /> : <Eye />}
+          </Button>
+        )}
+      </div>
+      {error ? (
+        <FieldError>{error}</FieldError>
+      ) : helper ? (
+        <p className="text-xs text-muted-foreground">{helper}</p>
+      ) : null}
     </Field>
   );
 }

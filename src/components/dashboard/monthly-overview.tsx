@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import type { MonthlyTrendPoint } from "@/types/dashboard";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatCompactAmount, formatDate, formatMoney } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,11 +29,24 @@ interface ChartPoint {
   expenses: number;
 }
 
+/** Today's date as YYYY-MM-DD in the browser's local timezone. */
+function getTodayString() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOverviewProps) {
   const [period, setPeriod] = useState<ChartPeriod>("current-month");
   const isCurrentMonth = period === "current-month";
+  // The daily series covers the whole month server-side; drop future days
+  // so the chart does not trail off as a flat zero line to month-end.
+  const visibleDailyTrend = isCurrentMonth
+    ? dailyTrend.filter((item) => item.date <= getTodayString())
+    : dailyTrend;
   const chartData: ChartPoint[] = isCurrentMonth
-    ? dailyTrend.map((item) => ({
+    ? visibleDailyTrend.map((item) => ({
         date: item.date,
         income: Number(item.income),
         expenses: Number(item.expenses),
@@ -43,6 +56,9 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
         income: Number(item.income),
         expenses: Number(item.expenses),
       }));
+  const hasData = chartData.some(
+    (point) => Number(point.income) > 0 || Number(point.expenses) > 0,
+  );
 
   const chartConfig = {
     income: { label: "Income", color: "#10b981" },
@@ -55,7 +71,7 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
         <div className="flex flex-col gap-1.5">
           <CardTitle>{isCurrentMonth ? "Daily Income vs. Expenses" : "Income vs. Expenses"}</CardTitle>
           <CardDescription>
-            {isCurrentMonth ? "Income and expenses by day for the current month" : "Monthly cash flow of the last six months"}
+            {isCurrentMonth ? "Income and expenses by day for the current month, in MMK" : "Monthly cash flow of the last six months, in MMK"}
           </CardDescription>
         </div>
         <Tabs value={period} onValueChange={(value) => value && setPeriod(value as ChartPeriod)}>
@@ -66,6 +82,13 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
         </Tabs>
       </CardHeader>
       <CardContent>
+        {!hasData ? (
+          <div className="flex h-72 w-full items-center justify-center text-sm text-muted-foreground sm:h-80">
+            {isCurrentMonth
+              ? "No data yet this month"
+              : "No transactions in the last 6 months"}
+          </div>
+        ) : (
         <ChartContainer config={chartConfig} className="h-72 w-full sm:h-80">
           <AreaChart
             data={chartData}
@@ -90,7 +113,7 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
                   ? (value: string) => formatDate(value).replace(/, \d{4}$/, "")
                   : undefined
               }
-              interval={isCurrentMonth ? Math.max(0, Math.ceil(dailyTrend.length / 5) - 1) : 0}
+              interval={isCurrentMonth ? Math.max(0, Math.ceil(visibleDailyTrend.length / 5) - 1) : 0}
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a1a1aa", fontSize: 12 }}
@@ -99,7 +122,7 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a1a1aa", fontSize: 12 }}
-              tickFormatter={(value: number) => value.toLocaleString("en-US")}
+              tickFormatter={(value: number) => formatCompactAmount(value)}
               width={64}
             />
             <Tooltip
@@ -135,6 +158,7 @@ export default function MonthlyOverview({ monthlyData, dailyTrend }: MonthlyOver
             />
           </AreaChart>
         </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

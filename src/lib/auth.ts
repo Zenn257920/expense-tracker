@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { sendResetPasswordEmail } from "@/lib/email";
 import { ensureDefaultCategories } from "@/lib/services/category-service";
 import {
   consumeSignupVerification,
@@ -26,7 +27,16 @@ export const auth = betterAuth({
       verification: schema.verification,
     },
   }),
-  emailAndPassword: { enabled: true, autoSignIn: false },
+  emailAndPassword: {
+    enabled: true,
+    autoSignIn: false,
+    // Built-in password reset: Better Auth generates the token and the
+    // reset link; we only send the email. The link points at
+    // /reset-password (see the forgot-password page).
+    sendResetPassword: async ({ user, url }) => {
+      await sendResetPasswordEmail(user.email, url);
+    },
+  },
   databaseHooks: {
     user: {
       create: {

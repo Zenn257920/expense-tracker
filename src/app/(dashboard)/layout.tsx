@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar, { DashboardHeader } from "@/components/layout/sidebar";
+import MobileBottomNav from "@/components/layout/mobile-bottom-nav";
 import { getAuthSession } from "@/lib/auth-session";
 import { redirect } from "next/navigation";
 
@@ -21,7 +22,10 @@ async function ProtectedDashboard({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <SidebarInset>
         <DashboardHeader />
-        <div className="min-w-0 flex-1">{children}</div>
+        {/* Bottom padding on mobile so the fixed bottom nav never
+            covers page content. */}
+        <div className="min-w-0 flex-1 pb-16 md:pb-0">{children}</div>
+        <MobileBottomNav />
       </SidebarInset>
     </SidebarProvider>
   );

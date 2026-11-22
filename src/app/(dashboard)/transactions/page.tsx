@@ -8,9 +8,17 @@ import type { RecentTransaction } from "@/types/dashboard";
 import { useCategories } from "@/hooks/use-categories";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
+import { formatMoney } from "@/lib/format";
 import TransactionsSkeleton from "@/components/transactions/transactions-skeleton";
-import { Download } from "lucide-react";
+import { Download, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import Input from "@/components/ui/input";
 import {
@@ -30,13 +38,23 @@ function toCsvCell(value: string) {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 400;
+const DATE_DEBOUNCE_MS = 400;
+
 type TransactionTypeFilter = "all" | TransactionType;
+
+interface FilteredTotals {
+  income: number;
+  expense: number;
+  count: number;
+}
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [filteredTotals, setFilteredTotals] = useState<FilteredTotals | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +65,9 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [appliedStartDate, setAppliedStartDate] = useState("");
+  const [appliedEndDate, setAppliedEndDate] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -59,6 +80,41 @@ export default function TransactionsPage() {
 
   const currentPage = Math.min(page, Math.max(1, totalPages));
 
+  // Live search: apply the typed query once the user stops typing, instead
+  // of waiting for the Search button.
+  useEffect(() => {
+    const query = searchInput.trim();
+    if (query === search) return;
+    const timer = setTimeout(() => {
+      setError(null);
+      setIsLoading(true);
+      setSearch(query);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput, search]);
+
+  // An inverted pair is an error and leaves the previous filter in place.
+  const dateError =
+    startDate && endDate && startDate > endDate
+      ? "The From date must be on or before the To date."
+      : null;
+
+  // Date pair: only apply once the pair is complete and valid, debounced
+  // so picking From and then To triggers a single refetch. A single bound
+  // (From-only or To-only) applies on its own.
+  useEffect(() => {
+    if (dateError) return;
+    if (startDate === appliedStartDate && endDate === appliedEndDate) return;
+    const timer = setTimeout(() => {
+      setAppliedStartDate(startDate);
+      setAppliedEndDate(endDate);
+      setIsLoading(true);
+      setPage(1);
+    }, DATE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [startDate, endDate, appliedStartDate, appliedEndDate, dateError]);
+
   useEffect(() => {
     let isActive = true;
 
@@ -70,8 +126,8 @@ export default function TransactionsPage() {
           search,
           type: typeFilter,
           categoryId: categoryId || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
+          startDate: appliedStartDate || undefined,
+          endDate: appliedEndDate || undefined,
         });
 
         if (isActive) {
@@ -79,6 +135,7 @@ export default function TransactionsPage() {
           setTransactions(result.data);
           setTotalTransactions(result.pagination.total);
           setTotalPages(result.pagination.totalPages);
+          setFilteredTotals(result.totals ?? null);
         }
       } catch (err) {
         if (isActive) {
@@ -97,7 +154,7 @@ export default function TransactionsPage() {
     return () => {
       isActive = false;
     };
-  }, [currentPage, refreshKey, search, typeFilter, categoryId, startDate, endDate]);
+  }, [currentPage, refreshKey, search, typeFilter, categoryId, appliedStartDate, appliedEndDate]);
 
   const refreshTransactions = useCallback(() => {
     setIsLoading(true);
@@ -105,7 +162,11 @@ export default function TransactionsPage() {
     setRefreshKey((key) => key + 1);
   }, []);
 
-  const hasFilters = Boolean(categoryId || startDate || endDate);
+  const isFiltered = Boolean(
+    search || typeFilter !== "all" || categoryId || appliedStartDate || appliedEndDate,
+  );
+  const activeFilterCount =
+    (categoryId ? 1 : 0) + (appliedStartDate || appliedEndDate ? 1 : 0);
 
   function applyFilterChange() {
     setError(null);
@@ -113,10 +174,15 @@ export default function TransactionsPage() {
     setPage(1);
   }
 
-  function clearFilters() {
+  function clearAllFilters() {
     setCategoryId("");
     setStartDate("");
     setEndDate("");
+    setAppliedStartDate("");
+    setAppliedEndDate("");
+    setSearchInput("");
+    setSearch("");
+    setTypeFilter("all");
     applyFilterChange();
   }
 
@@ -128,8 +194,8 @@ export default function TransactionsPage() {
         search,
         type: typeFilter,
         categoryId: categoryId || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate: appliedStartDate || undefined,
+        endDate: appliedEndDate || undefined,
       };
       const first = await api.getTransactions({ ...filters, page: 1, limit: 100 });
       const all = [...first.data];
@@ -214,7 +280,7 @@ export default function TransactionsPage() {
           </Tabs>
           <SearchBar
             value={searchInput}
-            placeholder="Search transactions..."
+            placeholder="Search description or category…"
             hasSearch={Boolean(search)}
             onChange={setSearchInput}
             onSearch={(query) => {
@@ -233,65 +299,83 @@ export default function TransactionsPage() {
           />
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <Field className="sm:min-w-48">
-            <FieldLabel htmlFor="filter-category">Category</FieldLabel>
-            <Select
-              items={[
-                { label: "All categories", value: "all" },
-                ...categoryOptions.map((category) => ({
-                  label: category.name,
-                  value: category.id,
-                })),
-              ]}
-              value={categoryId || "all"}
-              onValueChange={(value) => {
-                setCategoryId(value === "all" ? "" : (value ?? ""));
-                applyFilterChange();
-              }}
+        <div className="flex flex-col gap-3">
+          <div
+            className={`flex-col gap-3 sm:flex sm:flex-row sm:items-end ${
+              filtersOpen ? "flex" : "hidden"
+            }`}
+          >
+            <Field className="sm:min-w-48">
+              <FieldLabel htmlFor="filter-category">Category</FieldLabel>
+              <Select
+                items={[
+                  { label: "All categories", value: "all" },
+                  ...categoryOptions.map((category) => ({
+                    label: category.name,
+                    value: category.id,
+                  })),
+                ]}
+                value={categoryId || "all"}
+                onValueChange={(value) => {
+                  setCategoryId(value === "all" ? "" : (value ?? ""));
+                  applyFilterChange();
+                }}
+              >
+                <SelectTrigger id="filter-category" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categoryOptions.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field data-invalid={Boolean(dateError)}>
+              <FieldLabel htmlFor="filter-start-date">From</FieldLabel>
+              <Input
+                id="filter-start-date"
+                type="date"
+                value={startDate}
+                aria-invalid={Boolean(dateError)}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+            </Field>
+            <Field data-invalid={Boolean(dateError)}>
+              <FieldLabel htmlFor="filter-end-date">To</FieldLabel>
+              <Input
+                id="filter-end-date"
+                type="date"
+                value={endDate}
+                aria-invalid={Boolean(dateError)}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </Field>
+          </div>
+          {dateError && <FieldError>{dateError}</FieldError>}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="sm:hidden"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
             >
-              <SelectTrigger id="filter-category" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {categoryOptions.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-start-date">From</FieldLabel>
-            <Input
-              id="filter-start-date"
-              type="date"
-              value={startDate}
-              onChange={(event) => {
-                setStartDate(event.target.value);
-                applyFilterChange();
-              }}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-end-date">To</FieldLabel>
-            <Input
-              id="filter-end-date"
-              type="date"
-              value={endDate}
-              onChange={(event) => {
-                setEndDate(event.target.value);
-                applyFilterChange();
-              }}
-            />
-          </Field>
-          <div className="flex gap-2">
-            {hasFilters && (
-              <Button type="button" variant="outline" onClick={clearFilters}>
+              <SlidersHorizontal data-icon="inline-start" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+            {isFiltered && (
+              <Button type="button" variant="outline" onClick={clearAllFilters}>
                 Clear filters
               </Button>
             )}
@@ -328,23 +412,67 @@ export default function TransactionsPage() {
           </div>
         )}
 
-        {!error && (
-          <section className="space-y-4">
-            {isLoading ? (
-              <div className="py-10 text-center text-muted-foreground">
-                Loading transactions...
-              </div>
-            ) : (
-              <RecentTransactions
-                transactions={transactions}
-                categories={categories}
-                onTransactionChanged={refreshTransactions}
-              />
-            )}
-          </section>
+        {isFiltered && filteredTotals && (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {filteredTotals.count}{" "}
+            {filteredTotals.count === 1 ? "transaction" : "transactions"} ·{" "}
+            Expenses {formatMoney(filteredTotals.expense)} · Income{" "}
+            {formatMoney(filteredTotals.income)}
+          </p>
         )}
 
-        {!isLoading && !error && totalTransactions > 0 && (
+        <section className="space-y-4">
+          {transactions.length > 0 ? (
+            <RecentTransactions
+              transactions={transactions}
+              categories={categories}
+              onTransactionChanged={refreshTransactions}
+            />
+          ) : isLoading ? (
+            <div className="py-10 text-center text-muted-foreground">
+              Loading transactions...
+            </div>
+          ) : error ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              No transactions to show. Try again to reload.
+            </div>
+          ) : (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>
+                  {isFiltered
+                    ? "No transactions match your filters"
+                    : "No transactions yet"}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {isFiltered
+                    ? "Try different filters or add a transaction."
+                    : "Add your first transaction to see it here."}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent className="flex-row flex-wrap justify-center">
+                <AddTransactionDialog
+                  categories={categories}
+                  isLoadingCategories={isLoadingCategories}
+                  categoriesError={categoriesError}
+                  onTransactionAdded={refreshTransactions}
+                  onCategoriesChanged={refreshCategories}
+                />
+                {isFiltered && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearAllFilters}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </EmptyContent>
+            </Empty>
+          )}
+        </section>
+
+        {totalTransactions > 0 && (
           <TablePagination
             page={currentPage}
             totalPages={totalPages}

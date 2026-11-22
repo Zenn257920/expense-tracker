@@ -26,6 +26,15 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import { formatMoneySuffix, formatNumericDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,7 +76,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CreateLoanInput, Loan, LoanType } from "@/types/loan";
 
 type LoanFilter = "all" | LoanType;
-type LoanEditForm = CreateLoanInput;
+// Interest rate is not collected: it is stored but never calculated, and
+// the server defaults it to 0 when omitted from the payload.
+type LoanEditForm = Omit<CreateLoanInput, "interestRate">;
+
+const loanTypeItems = [
+  { label: "Borrowed", value: "borrowed" },
+  { label: "Lent", value: "lent" },
+];
 
 const statusLabels: Record<Loan["status"], string> = {
   active: "Unpaid",
@@ -123,9 +139,10 @@ export default function LoanPage() {
     setRefreshKey((key) => key + 1);
   }, []);
 
-  async function handleAddLoan(data: CreateLoanInput) {
+  async function handleAddLoan(data: Omit<CreateLoanInput, "interestRate">) {
     try {
-      await api.createLoan(data);
+      // The server defaults interestRate to 0; it is intentionally not sent.
+      await api.createLoan(data as CreateLoanInput);
       refreshLoans();
       toast.success("Loan added successfully.");
     } catch (err) {
@@ -149,7 +166,6 @@ export default function LoanPage() {
       amount: loan.amount,
       borrowedDate: loan.borrowedDate.slice(0, 10),
       dueDate: loan.dueDate.slice(0, 10),
-      interestRate: loan.interestRate,
       description: loan.description ?? "",
     });
   }
@@ -168,7 +184,6 @@ export default function LoanPage() {
         personName: editForm.personName.trim(),
         type: editForm.type,
         amount: Number(editForm.amount),
-        interestRate: Number(editForm.interestRate),
         borrowedDate: editForm.borrowedDate,
         dueDate: editForm.dueDate,
         description: editForm.description?.trim() || null,
@@ -239,18 +254,6 @@ export default function LoanPage() {
         </div>
       </div>
 
-      <LoanSummary
-        overview={overview}
-        isLoading={isLoading}
-        hasError={Boolean(error)}
-      />
-
-      <LoanDashboardOverview
-        overview={overview}
-        isLoading={isLoading}
-        error={error}
-      />
-
       <section className="min-w-0 space-y-4">
         {actionError && <FieldError>{actionError}</FieldError>}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -306,8 +309,119 @@ export default function LoanPage() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
-            <Table className="min-w-[1020px]">
+          <>
+            <ul className="flex flex-col gap-3 sm:hidden">
+              {paginatedLoans.map((loan) => (
+                <li key={loan.id}>
+                  <Card>
+                    <CardContent className="flex flex-col gap-3">
+                      <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {loan.personName}
+                          </p>
+                          {loan.description && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {loan.description}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            <span className="capitalize">{loan.type}</span>
+                            {" · "}
+                            {formatNumericDate(loan.borrowedDate)}
+                            {" → "}
+                            {formatNumericDate(loan.dueDate)}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            loan.status === "overdue"
+                              ? "destructive"
+                              : loan.status === "paid"
+                                ? "secondary"
+                                : "outline"
+                          }
+                        >
+                          {statusLabels[loan.status]}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Amount
+                          </p>
+                          <p className="font-medium tabular-nums">
+                            {formatMoneySuffix(loan.amount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Paid</p>
+                          <p className="font-medium tabular-nums">
+                            {formatMoneySuffix(loan.paidAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Remaining
+                          </p>
+                          <p className="font-medium tabular-nums">
+                            {formatMoneySuffix(loan.remainingAmount)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {calculateLoanProgress(loan).toFixed(1)}% repaid
+                        </span>
+                        <Progress
+                          value={calculateLoanProgress(loan)}
+                          aria-label={`${loan.personName} repayment progress`}
+                          className="gap-0"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {loan.remainingAmount > 0 && (
+                          <LoanRecordPaymentDialog
+                            loan={loan}
+                            onPayment={handleRecordPayment}
+                            className="h-10 w-full"
+                          />
+                        )}
+                        <div className="flex gap-2">
+                          <LoanPaymentHistoryDialog
+                            loan={loan}
+                            onChanged={() => refreshLoans(false)}
+                            className="h-10 flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-10 w-10"
+                            aria-label="Edit loan"
+                            onClick={() => startEditing(loan)}
+                          >
+                            <Pencil data-icon="inline-start" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="h-10 w-10"
+                            aria-label="Delete loan"
+                            onClick={() => setDeleteTarget(loan)}
+                          >
+                            <Trash2 data-icon="inline-start" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto rounded-lg border sm:block">
+              <Table className="min-w-[1020px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Person</TableHead>
@@ -410,7 +524,8 @@ export default function LoanPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </>
         )}
         {!error && !isLoading && visibleLoans.length > 0 && (
           <TablePagination
@@ -423,6 +538,18 @@ export default function LoanPage() {
           />
         )}
       </section>
+
+      <LoanSummary
+        overview={overview}
+        isLoading={isLoading}
+        hasError={Boolean(error)}
+      />
+
+      <LoanDashboardOverview
+        overview={overview}
+        isLoading={isLoading}
+        error={error}
+      />
 
       <Dialog
         open={Boolean(editing)}
@@ -465,20 +592,33 @@ export default function LoanPage() {
                   <FieldLabel htmlFor={`loan-type-${editing.id}`}>
                     Type
                   </FieldLabel>
-                  <select
-                    id={`loan-type-${editing.id}`}
+                  <Select
+                    items={loanTypeItems}
                     value={editForm.type}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
+                      value &&
                       setEditForm({
                         ...editForm,
-                        type: event.target.value as LoanType,
+                        type: value as LoanType,
                       })
                     }
-                    className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
                   >
-                    <option value="borrowed">Borrowed</option>
-                    <option value="lent">Lent</option>
-                  </select>
+                    <SelectTrigger
+                      id={`loan-type-${editing.id}`}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {loanTypeItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`loan-amount-${editing.id}`}>
@@ -494,26 +634,6 @@ export default function LoanPage() {
                       setEditForm({
                         ...editForm,
                         amount: Number(event.target.value),
-                      })
-                    }
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`loan-interest-${editing.id}`}>
-                    Interest rate (%)
-                  </FieldLabel>
-                  <Input
-                    id={`loan-interest-${editing.id}`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={editForm.interestRate}
-                    onChange={(event) =>
-                      setEditForm({
-                        ...editForm,
-                        interestRate: Number(event.target.value),
                       })
                     }
                     required

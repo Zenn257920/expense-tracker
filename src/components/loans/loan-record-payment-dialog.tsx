@@ -25,11 +25,14 @@ interface LoanRecordPaymentDialogProps {
     loanId: string,
     input: { amount: number; paymentDate: string; note?: string },
   ) => Promise<void>;
+  /** Extra classes for the trigger button (e.g. full-width on mobile cards). */
+  className?: string;
 }
 
 export default function LoanRecordPaymentDialog({
   loan,
   onPayment,
+  className,
 }: LoanRecordPaymentDialogProps) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -75,8 +78,13 @@ export default function LoanRecordPaymentDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button type="button" variant="outline" size="sm">
-            Payment
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={className}
+          >
+            {loan.type === "borrowed" ? "Repay" : "Received"}
           </Button>
         }
       />

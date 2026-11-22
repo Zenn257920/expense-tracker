@@ -1,9 +1,4 @@
-import {
-  AlertCircle,
-  ArrowDownLeft,
-  ArrowUpRight,
-  CalendarClock,
-} from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoneySuffix } from "@/lib/format";
@@ -16,15 +11,15 @@ interface LoanSummaryProps {
 }
 
 export default function LoanSummary({ overview, isLoading, hasError }: LoanSummaryProps) {
+  // Upcoming/overdue totals are not repeated here: they appear as headers
+  // over the Upcoming/Overdue lists in LoanDashboardOverview.
   const cards = [
     { title: "Total Borrowed", amount: overview.borrowedTotal, icon: ArrowDownLeft, color: "text-red-500" },
     { title: "Total Lent", amount: overview.lentTotal, icon: ArrowUpRight, color: "text-green-500" },
-    { title: "Upcoming Payments", amount: overview.upcomingTotal, icon: CalendarClock, color: "text-blue-500" },
-    { title: "Overdue Loans", amount: overview.overdueTotal, icon: AlertCircle, color: "text-orange-500" },
   ];
 
   return (
-    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2">
       {cards.map((card) => (
         <Card key={card.title} className="min-w-0">
           <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
@@ -26,14 +26,17 @@ export interface TransactionFilters {
 function validateTransaction(input: TransactionInput) {
   const { categoryId, description, amount, transactionDate } = input;
 
-  if (!categoryId || !description || amount === undefined || !transactionDate) {
+  // Description is optional — an empty one is replaced with the category
+  // name by createTransaction (see below).
+  if (!categoryId || amount === undefined || !transactionDate) {
     throw new ApiError("All fields are required", 400);
   }
-  if (typeof categoryId !== "string" || typeof description !== "string" ||
+  if (typeof categoryId !== "string" ||
+      (description !== undefined && typeof description !== "string") ||
       typeof amount !== "number" || typeof transactionDate !== "string") {
     throw new ApiError("Invalid input data", 400);
   }
-  if (!description.trim() || description.length > 500) {
+  if (description !== undefined && description.length > 500) {
     throw new ApiError("Description must be 1-500 characters", 400);
   }
   if (!isValidAmount(amount)) {
@@ -43,7 +46,7 @@ function validateTransaction(input: TransactionInput) {
     throw new ApiError("Invalid transaction date", 400);
   }
 
-  return { categoryId, description: description.trim(), amount, transactionDate };
+  return { categoryId, description: description?.trim() ?? "", amount, transactionDate };
 }
 
 export async function listTransactions(userId: string, options: TransactionFilters = {}) {
@@ -73,8 +76,17 @@ export async function listTransactions(userId: string, options: TransactionFilte
     if (searchFilter) filters.push(searchFilter);
   }
 
-  const [countResult, data] = await Promise.all([
+  const [countResult, totalsResult, data] = await Promise.all([
     db.select({ total: count() })
+      .from(transactions)
+      .innerJoin(categories, eq(transactions.categoryId, categories.id))
+      .where(and(...filters)),
+    // Totals over the whole filtered set (not just the returned page),
+    // so the list can show "Food this month: 84,500 MMK" style summaries.
+    db.select({
+      income: sql<number>`coalesce(sum(case when ${categories.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
+      expense: sql<number>`coalesce(sum(case when ${categories.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
+    })
       .from(transactions)
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
       .where(and(...filters)),
@@ -97,19 +109,27 @@ export async function listTransactions(userId: string, options: TransactionFilte
 
   const total = Number(countResult[0].total);
 
-  return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  return {
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    totals: {
+      income: Number(totalsResult[0]?.income ?? 0),
+      expense: Number(totalsResult[0]?.expense ?? 0),
+      count: total,
+    },
+  };
 }
 
 export async function createTransaction(userId: string, input: TransactionInput) {
   const values = validateTransaction(input);
-  const [category] = await db.select({ id: categories.id }).from(categories)
+  const [category] = await db.select({ id: categories.id, name: categories.name }).from(categories)
     .where(and(eq(categories.id, values.categoryId), eq(categories.userId, userId))).limit(1);
   if (!category) throw new ApiError("Category not found", 404);
 
   const [transaction] = await db.insert(transactions).values({
     userId,
     categoryId: values.categoryId,
-    description: values.description,
+    description: values.description || category.name,
     amount: values.amount.toFixed(2),
     transactionDate: values.transactionDate,
   }).returning();
@@ -135,11 +155,18 @@ export async function updateTransaction(userId: string, id: string, input: Trans
     updates.categoryId = input.categoryId;
   }
 
+  // An empty description falls back to the category name (same as create).
+  let defaultDescriptionFromCategory = false;
   if (input.description !== undefined) {
-    if (typeof input.description !== "string" || !input.description.trim() || input.description.trim().length > 500) {
+    if (typeof input.description !== "string" || input.description.length > 500) {
       throw new ApiError("Description must be 1-500 characters", 400);
     }
-    updates.description = input.description.trim();
+    const trimmed = input.description.trim();
+    if (trimmed) {
+      updates.description = trimmed;
+    } else {
+      defaultDescriptionFromCategory = true;
+    }
   }
 
   if (input.amount !== undefined) {
@@ -154,6 +181,23 @@ export async function updateTransaction(userId: string, id: string, input: Trans
       throw new ApiError("Invalid transaction date", 400);
     }
     updates.transactionDate = input.transactionDate;
+  }
+
+  if (defaultDescriptionFromCategory) {
+    // Use the new category when one was picked, otherwise the
+    // transaction's current category.
+    let categoryId = updates.categoryId;
+    if (!categoryId) {
+      const [existing] = await db.select({ categoryId: transactions.categoryId })
+        .from(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
+        .limit(1);
+      if (!existing) throw new ApiError("Transaction not found", 404);
+      categoryId = existing.categoryId;
+    }
+    const [category] = await db.select({ name: categories.name }).from(categories)
+      .where(eq(categories.id, categoryId)).limit(1);
+    if (category) updates.description = category.name;
   }
 
   if (Object.keys(updates).length === 1) throw new ApiError("No fields provided to update", 400);

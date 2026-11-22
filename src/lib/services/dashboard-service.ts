@@ -186,5 +186,7 @@ export async function getDashboardSummary(userId: string) {
     loanReceivedThisMonth: formatAmount(toCents(
       loanPaymentResults.find((item) => item.type === "lent")?.total ?? null,
     )),
+    borrowedRemaining: formatAmount(borrowedRemaining),
+    lentRemaining: formatAmount(lentRemaining),
   };
 }

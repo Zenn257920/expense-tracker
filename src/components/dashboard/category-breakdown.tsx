@@ -3,30 +3,46 @@
 import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
-import { formatAmount } from "@/lib/format";
+import AddTransactionDialog from "@/components/transactions/add-transaction-dialog";
+import { formatMoney } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { CategoryBreakdownPoint, TransactionType } from "@/types/dashboard";
+import type { Category, CategoryBreakdownPoint, TransactionType } from "@/types/dashboard";
 
 interface CategoryBreakdownProps {
   breakdown: CategoryBreakdownPoint[];
+  categories: Category[];
+  isLoadingCategories: boolean;
+  categoriesError: string | null;
+  onTransactionAdded: () => void | Promise<void>;
+  onCategoriesChanged?: () => void | Promise<void>;
 }
 
-export default function CategoryBreakdown({ breakdown }: CategoryBreakdownProps) {
+export default function CategoryBreakdown({
+  breakdown,
+  categories,
+  isLoadingCategories,
+  categoriesError,
+  onTransactionAdded,
+  onCategoriesChanged,
+}: CategoryBreakdownProps) {
   const [type, setType] = useState<TransactionType>("expense");
   const items = breakdown.filter((item) => item.type === type);
   const typeTotal = items.reduce((sum, item) => sum + Number(item.total), 0);
-  const topTotal = items.length > 0 ? Number(items[0].total) : 0;
   const Icon = type === "income" ? ArrowUpRight : ArrowDownLeft;
 
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1.5">
-          <CardTitle>Spending by category</CardTitle>
+          <CardTitle>
+            {type === "income" ? "Income by category" : "Spending by category"}
+          </CardTitle>
           <CardDescription>
-            Where your money went this month, by category.
+            {type === "income"
+              ? "Where your money came from this month, by category."
+              : "Where your money went this month, by category."}
           </CardDescription>
         </div>
         <Tabs
@@ -50,13 +66,21 @@ export default function CategoryBreakdown({ breakdown }: CategoryBreakdownProps)
                 Add a transaction and it will show up here.
               </EmptyDescription>
             </EmptyHeader>
+            <EmptyContent>
+              <AddTransactionDialog
+                categories={categories}
+                isLoadingCategories={isLoadingCategories}
+                categoriesError={categoriesError}
+                onTransactionAdded={onTransactionAdded}
+                onCategoriesChanged={onCategoriesChanged}
+              />
+            </EmptyContent>
           </Empty>
         ) : (
           <ul className="flex flex-col gap-4">
             {items.map((item) => {
               const amount = Number(item.total);
               const percent = typeTotal > 0 ? Math.round((amount / typeTotal) * 100) : 0;
-              const width = topTotal > 0 ? Math.max(4, (amount / topTotal) * 100) : 0;
               return (
                 <li key={`${item.type}-${item.categoryName}`} className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between gap-3 text-sm">
@@ -67,7 +91,7 @@ export default function CategoryBreakdown({ breakdown }: CategoryBreakdownProps)
                       <span className="truncate">{item.categoryName}</span>
                     </span>
                     <span className="shrink-0 tabular-nums">
-                      {formatAmount(item.total)} MMK
+                      {formatMoney(item.total)}
                       <span className="ml-2 text-muted-foreground">{percent}%</span>
                     </span>
                   </div>
@@ -81,7 +105,7 @@ export default function CategoryBreakdown({ breakdown }: CategoryBreakdownProps)
                   >
                     <div
                       className="h-full rounded-full bg-primary"
-                      style={{ width: `${width}%` }}
+                      style={{ width: `${percent}%` }}
                     />
                   </div>
                 </li>

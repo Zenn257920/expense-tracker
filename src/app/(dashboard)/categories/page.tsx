@@ -64,7 +64,7 @@ const typeItems = [
   { label: "Expense", value: "expense" },
   { label: "Income", value: "income" },
 ];
-const CATEGORY_PAGE_SIZE = 5;
+const CATEGORY_PAGE_SIZE = 10;
 
 export default function CategoriesPage() {
   const {
@@ -82,6 +82,7 @@ export default function CategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [categoryPage, setCategoryPage] = useState(1);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const categoryTotalPages = Math.ceil(categories.length / CATEGORY_PAGE_SIZE);
   const currentCategoryPage = Math.min(categoryPage, Math.max(1, categoryTotalPages));
   const paginatedCategories = categories.slice(
@@ -91,12 +92,22 @@ export default function CategoriesPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const trimmedName = name.trim();
     setError("");
     setIsSaving(true);
     try {
-      await api.createCategory({ name, type });
+      await api.createCategory({ name: trimmedName, type });
       setName("");
       await refreshCategories();
+      // Jump to the page holding the new category so the user sees it.
+      const updated = await api.getCategories();
+      const index = updated.findIndex(
+        (category) => category.name === trimmedName && category.type === type,
+      );
+      if (index >= 0) {
+        setCategoryPage(Math.floor(index / CATEGORY_PAGE_SIZE) + 1);
+        setHighlightId(updated[index]?.id ?? null);
+      }
       toast.success("Category added successfully.");
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not create category."));
@@ -118,7 +129,10 @@ export default function CategoriesPage() {
     setError("");
     setIsSaving(true);
     try {
-      await api.updateCategory(editing.id, { name: editName, type: editType });
+      await api.updateCategory(editing.id, {
+        name: editName.trim(),
+        type: editType,
+      });
       setEditing(null);
       await refreshCategories();
       toast.success("Category updated successfully.");
@@ -300,7 +314,14 @@ export default function CategoriesPage() {
                   const isIncome = category.type === "income";
                   return (
                     <li key={category.id}>
-                      <Card size="sm">
+                      <Card
+                        size="sm"
+                        className={
+                          category.id === highlightId
+                            ? "ring-2 ring-primary"
+                            : undefined
+                        }
+                      >
                         <CardContent className="flex flex-wrap items-center justify-between gap-3">
                           {editing?.id === category.id ? (
                             <form
@@ -358,7 +379,7 @@ export default function CategoriesPage() {
                                 disabled={isSaving}
                                 className="self-end"
                               >
-                                Save
+                                Save changes
                               </Button>
                               <Button
                                 type="button"
@@ -422,7 +443,10 @@ export default function CategoriesPage() {
                   totalItems={categories.length}
                   pageSize={CATEGORY_PAGE_SIZE}
                   itemLabel="categories"
-                  onPageChange={setCategoryPage}
+                  onPageChange={(page) => {
+                    setHighlightId(null);
+                    setCategoryPage(page);
+                  }}
                 />
               </div>
             )}

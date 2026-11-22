@@ -37,11 +37,16 @@ export default function AddTransactionDialog({
     setIsOpen(false);
   }
 
+  // "Save & add another" refreshes the lists but keeps the dialog open.
+  async function handleTransactionSaved() {
+    await onTransactionAdded();
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger
         render={
-          <Button type="button" variant="outline">
+          <Button type="button">
             <Plus data-icon="inline-start" />
             Add transaction
           </Button>
@@ -59,6 +64,7 @@ export default function AddTransactionDialog({
           isLoadingCategories={isLoadingCategories}
           categoriesError={categoriesError}
           onTransactionAdded={handleTransactionAdded}
+          onTransactionSaved={handleTransactionSaved}
           onCategoriesChanged={onCategoriesChanged}
         />
       </DialogContent>

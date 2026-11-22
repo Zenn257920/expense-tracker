@@ -38,6 +38,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useCategories } from "@/hooks/use-categories";
+import AddTransactionDialog from "@/components/transactions/add-transaction-dialog";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 
@@ -103,7 +105,7 @@ export default function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup className="px-3 py-4 group-data-[collapsible=icon]:px-2">
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupLabel>MyFinance</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
@@ -182,31 +184,37 @@ export default function AppSidebar() {
 
 export function DashboardHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const {
+    categories,
+    isLoading,
+    error,
+    refreshCategories,
+  } = useCategories();
   const title =
     pathname === "/transactions/new"
       ? "Add transaction"
       : (menuItems.find(
           (item) =>
             pathname === item.href || pathname.startsWith(`${item.href}/`),
-        )?.label ?? "Workspace");
+        )?.label ?? "MyFinance");
 
   return (
     <header className="flex h-14 items-center gap-3 border-b px-4 sm:px-6 justify-between">
       <div className="flex items-center gap-3">
-        <SidebarTrigger />
+        <SidebarTrigger className="size-10" />
         <div className="h-5 w-px bg-border" />
         <h1 className="text-sm font-medium text-foreground">{title}</h1>
       </div>
-      {/* <div>
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link href="/transactions/new" />}
-        >
-          <Plus data-icon="inline-start" />
-          Add Transaction
-        </Button>
-      </div> */}
+      <div className="hidden sm:block">
+        <AddTransactionDialog
+          categories={categories}
+          isLoadingCategories={isLoading}
+          categoriesError={error}
+          onTransactionAdded={() => router.refresh()}
+          onCategoriesChanged={refreshCategories}
+        />
+      </div>
     </header>
   );
 }

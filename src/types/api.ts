@@ -39,6 +39,8 @@ export interface TransactionListResponse {
     total: number;
     totalPages: number;
   };
+  /** Totals over the filtered query (not just the returned page). */
+  totals: { income: number; expense: number; count: number };
 }
 
 export interface TransactionFilters {

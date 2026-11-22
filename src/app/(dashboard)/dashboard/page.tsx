@@ -8,7 +8,7 @@ import MonthlyOverview from "@/components/dashboard/monthly-overview";
 import AddTransactionDialog from "@/components/transactions/add-transaction-dialog";
 import { useCategories } from "@/hooks/use-categories";
 import type { DashboardSummary } from "@/types/dashboard";
-import { formatAmount } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,13 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { FieldError } from "@/components/ui/field";
+
+function signedMoney(value: string | number, positiveSign = "+") {
+  const numeric = Number(value);
+  const sign = numeric < 0 ? "−" : positiveSign;
+  return `${sign}${formatMoney(Math.abs(numeric))}`;
+}
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -81,7 +88,9 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  if (error) {
+  // Full-page error only when nothing has loaded yet. On a later refresh
+  // the loaded dashboard stays visible and the error shows as a banner.
+  if (error && !summary) {
     return (
       <div className="p-4 sm:p-6">
         <Card className="mx-auto max-w-2xl">
@@ -110,6 +119,7 @@ export default function DashboardPage() {
 
   const thisMonthNet =
     Number(summary.thisMonthIncome) - Number(summary.thisMonthExpenses);
+  const { borrowedRemaining, lentRemaining } = summary;
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8">
@@ -127,69 +137,97 @@ export default function DashboardPage() {
           />
         </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <SummaryCard
-            title="Total Balance"
-            amount={formatAmount(summary.balance) + " MMK"}
-            description="Cash from transactions plus outstanding borrowed and lent amounts"
-            icon="balance"
-          />
-
-          <SummaryCard
-            title="Total Income"
-            amount={formatAmount(summary.totalIncome) + " MMK"}
-            description="Income recorded so far"
-            icon="income"
-          />
-
-          <SummaryCard
-            title="Total Expenses"
-            amount={formatAmount(summary.totalExpenses) + " MMK"}
-            description="Expenses recorded so far"
-            icon="expenses"
-          />
-        </section>
+        {error && (
+          <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <FieldError>{error}</FieldError>
+            <Button variant="outline" onClick={() => void refreshDashboard()}>
+              Try again
+            </Button>
+          </div>
+        )}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard
             title="This month's income"
-            amount={formatAmount(summary.thisMonthIncome) + " MMK"}
+            amount={signedMoney(summary.thisMonthIncome)}
             description="Income recorded this month"
             icon="income"
+            tone="income"
           />
 
           <SummaryCard
             title="This month's expenses"
-            amount={formatAmount(summary.thisMonthExpenses) + " MMK"}
+            amount={signedMoney(summary.thisMonthExpenses, "−")}
             description="Expenses recorded this month"
             icon="expenses"
+            tone="expense"
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>This month&apos;s balance</CardTitle>
-              <CardDescription>
-                Income minus expenses this month
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1">
-              <p className="text-2xl font-semibold tabular-nums">
-                {formatAmount(thisMonthNet)} MMK
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Loan repayments paid: {formatAmount(summary.loanRepaidThisMonth)} MMK
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Loan repayments received: {formatAmount(summary.loanReceivedThisMonth)} MMK
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Loan payments are shown separately; they are not transactions.
-              </p>
-            </CardContent>
-          </Card>
+          <SummaryCard
+            title="This month's balance"
+            amount={signedMoney(thisMonthNet)}
+            description="Income minus expenses this month"
+            icon="balance"
+            tone={thisMonthNet < 0 ? "negative" : "positive"}
+          >
+            <p className="mt-3 text-sm text-muted-foreground">
+              Loan repayments paid: {formatMoney(summary.loanRepaidThisMonth)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Loan repayments received: {formatMoney(summary.loanReceivedThisMonth)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Loan payments are shown separately; they are not transactions.
+            </p>
+          </SummaryCard>
         </section>
 
-        <CategoryBreakdown breakdown={summary.categoryBreakdown} />
+        <p className="text-sm text-muted-foreground">
+          All time · Income{" "}
+          <span className="font-medium text-green-600 dark:text-green-400">
+            +{formatMoney(summary.totalIncome)}
+          </span>{" "}
+          · Expenses{" "}
+          <span className="font-medium text-red-600 dark:text-red-400">
+            −{formatMoney(summary.totalExpenses)}
+          </span>
+        </p>
+
+        <Card size="sm" className="min-w-0">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Balance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="break-words text-2xl font-semibold tracking-tight tabular-nums">
+              {signedMoney(summary.balance, "")}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Income minus expenses, plus money you still hold from borrowing,
+              minus money you lent out.
+            </p>
+            {borrowedRemaining !== undefined && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Borrowed outstanding: {formatMoney(borrowedRemaining)}
+              </p>
+            )}
+            {lentRemaining !== undefined && (
+              <p className="text-sm text-muted-foreground">
+                Lent outstanding: {formatMoney(lentRemaining)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <CategoryBreakdown
+          breakdown={summary.categoryBreakdown}
+          categories={categories}
+          isLoadingCategories={isLoadingCategories}
+          categoriesError={categoriesError}
+          onTransactionAdded={refreshDashboard}
+          onCategoriesChanged={refreshCategories}
+        />
 
         <MonthlyOverview
           monthlyData={summary.monthlyTrend}
