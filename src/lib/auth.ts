@@ -1,9 +1,14 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { ensureDefaultCategories } from "@/lib/services/category-service";
+import {
+  consumeSignupVerification,
+  isSignupVerified,
+} from "@/lib/signup-otp";
 
 const baseURL =
   process.env.BETTER_AUTH_URL ??
@@ -24,10 +29,26 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // No account without a verified email: sign-up is only allowed
+        // within 15 minutes after the OTP was verified (see signup-otp).
+        // This is a backstop — the register form already verifies the
+        // OTP before calling sign-up.
+        before: async (user) => {
+          if (!(await isSignupVerified(user.email))) {
+            throw new APIError("BAD_REQUEST", {
+              message: "Please verify your email with the OTP code first.",
+            });
+          }
+        },
         // New accounts start with starter categories (Food, Transport,
         // Salary, ...) so the first transaction can be added right away.
         // Seeding must never block signup, so failures are only logged.
         after: async (user) => {
+          try {
+            await consumeSignupVerification(user.email);
+          } catch (error) {
+            console.error("[consume signup verification]", error);
+          }
           try {
             await ensureDefaultCategories(user.id);
           } catch (error) {
