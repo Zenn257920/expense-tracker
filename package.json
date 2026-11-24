@@ -15,6 +15,9 @@
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@better-auth/drizzle-adapter": "^1.7.25",
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor/android": "^7.6.10",
+    "@capacitor/core": "^7.6.10",
     "@neondatabase/serverless": "^1.2.0",
     "@shadcn/react": "^0.3.1",
     "axios": "^1.21.1",
@@ -41,6 +44,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.10",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",

@@ -35,6 +35,25 @@ to the canonical app URL in each environment. Existing finance rows are retained
 under their current user IDs; registering a new account does not claim legacy
 demo data automatically.
 
+## Android app (APK, sideload — no Play Store)
+
+The app is also wrapped with Capacitor (`capacitor.config.ts`,
+app ID `com.kaung.myfinance`) so it installs as a real Android app.
+The APK is a WebView that loads the live Vercel site — it needs
+internet, and web fixes reach it without a reinstall.
+
+Voice input in the APK uses the native speech plugin
+(`@capacitor-community/speech-recognition`) because the browser Web
+Speech API does not exist in a WebView. In the browser it keeps using
+the Web Speech API. Either way the transcript goes through the same
+local parser, in Burmese (my-MM) or English.
+
+Build it with GitHub Actions (`.github/workflows/android.yml`): every
+push to main builds a debug APK (artifact `myfinance-apk`). The
+workflow regenerates `android/` from the Capacitor template, restores
+a fixed debug keystore so updates install over the old APK, and bumps
+`versionCode` to the run number.
+
 ## Deploy to Vercel
 
 1. Push the project to a Git provider supported by Vercel, then import the repository at [vercel.com/new](https://vercel.com/new). Vercel detects Next.js and configures the build automatically.

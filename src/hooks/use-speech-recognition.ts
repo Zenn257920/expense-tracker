@@ -7,6 +7,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { Capacitor } from "@capacitor/core";
+import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -97,25 +99,134 @@ export function useSpeechRecognition(
 ) {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const finalTranscriptRef = useRef("");
+  // In the Android APK the page runs in a WebView, where the browser
+  // Web Speech API does not exist. There, voice goes through the
+  // native speech plugin instead (same transcript → same parser).
+  const isNative =
+    typeof window !== "undefined" && Capacitor.isNativePlatform();
+  const [nativeAvailable, setNativeAvailable] = useState<boolean | null>(null);
+  const nativeListeningRef = useRef(false);
+  const nativeFinalizedRef = useRef(false);
   const support = useSyncExternalStore(
     subscribeToSpeechSupport,
     getSpeechSupportSnapshot,
     getServerSpeechSupportSnapshot,
   );
-  const isSupported = support === true;
-  const isCheckingSupport = support === null;
+  const isSupported = isNative
+    ? nativeAvailable === true
+    : support === true;
+  const isCheckingSupport = isNative
+    ? nativeAvailable === null
+    : support === null;
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isNative) return;
+    let isActive = true;
+    SpeechRecognition.available()
+      .then(({ available }) => {
+        if (isActive) setNativeAvailable(available);
+      })
+      .catch(() => {
+        if (isActive) setNativeAvailable(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [isNative]);
+
+  useEffect(() => {
     return () => {
       recognitionRef.current?.abort();
       recognitionRef.current = null;
+      if (isNative) {
+        void SpeechRecognition.stop().catch(() => {});
+        void SpeechRecognition.removeAllListeners().catch(() => {});
+      }
     };
-  }, []);
+  }, [isNative]);
+
+  const finalizeNative = useCallback(
+    (finalText: string) => {
+      if (nativeFinalizedRef.current) return;
+      nativeFinalizedRef.current = true;
+      nativeListeningRef.current = false;
+      setTranscript(finalText);
+      if (finalText) onTranscript?.(finalText);
+      setIsListening(false);
+      void SpeechRecognition.removeAllListeners().catch(() => {});
+    },
+    [onTranscript],
+  );
+
+  const startNativeListening = useCallback(async () => {
+    setError(null);
+    setTranscript("");
+    finalTranscriptRef.current = "";
+    nativeFinalizedRef.current = false;
+    try {
+      const permission = await SpeechRecognition.requestPermissions();
+      if (permission.speechRecognition !== "granted") {
+        setError(
+          "Microphone access was blocked. Allow microphone access and try again.",
+        );
+        return;
+      }
+      const { available } = await SpeechRecognition.available();
+      if (!available) {
+        setError(
+          "Speech recognition is not available on this device. Type the transaction below instead.",
+        );
+        return;
+      }
+      await SpeechRecognition.addListener("partialResults", ({ matches }) => {
+        const text = matches?.[0] ?? "";
+        finalTranscriptRef.current = text;
+        setTranscript(text);
+      });
+      await SpeechRecognition.addListener("listeningState", ({ status }) => {
+        if (status === "stopped") {
+          finalizeNative(finalTranscriptRef.current);
+        }
+      });
+      nativeListeningRef.current = true;
+      setIsListening(true);
+      const { matches } = await SpeechRecognition.start({
+        language,
+        maxResults: 1,
+        partialResults: true,
+        popup: false,
+      });
+      // With partialResults the promise resolves without a result; the
+      // final text arrives via the listeners. If the platform does
+      // return matches, use them.
+      if (matches?.[0]) {
+        finalizeNative(matches[0]);
+      }
+    } catch {
+      nativeListeningRef.current = false;
+      setIsListening(false);
+      void SpeechRecognition.removeAllListeners().catch(() => {});
+      setError("Could not start the microphone. Please try again.");
+    }
+  }, [language, finalizeNative]);
+
+  const stopNativeListening = useCallback(() => {
+    if (!nativeListeningRef.current) return;
+    SpeechRecognition.stop().catch(() => {
+      // The recognizer may already have stopped; finalize with what we
+      // have instead of leaving the mic button stuck on.
+      finalizeNative(finalTranscriptRef.current);
+    });
+  }, [finalizeNative]);
 
   const startListening = useCallback(() => {
+    if (isNative) {
+      void startNativeListening();
+      return;
+    }
     if (recognitionRef.current) return;
 
     const Recognition = getSpeechRecognitionConstructor();
@@ -180,9 +291,13 @@ export function useSpeechRecognition(
       setIsListening(false);
       setError("Could not start the microphone. Please try again.");
     }
-  }, [language, onTranscript]);
+  }, [isNative, startNativeListening, language, onTranscript]);
 
   const stopListening = useCallback(() => {
+    if (isNative) {
+      stopNativeListening();
+      return;
+    }
     try {
       recognitionRef.current?.stop();
     } catch {
@@ -190,7 +305,7 @@ export function useSpeechRecognition(
       recognitionRef.current = null;
       setIsListening(false);
     }
-  }, []);
+  }, [isNative, stopNativeListening]);
 
   const resetTranscript = useCallback(() => {
     setTranscript("");
