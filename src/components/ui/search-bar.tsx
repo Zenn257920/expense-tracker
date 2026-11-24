@@ -32,7 +32,7 @@ export default function SearchBar({
         event.preventDefault();
         onSearch(value.trim());
       }}
-      className="flex flex-col gap-2 sm:flex-row"
+      className="flex items-center gap-2"
     >
       <InputGroup className="h-10 min-w-0 flex-1">
         <InputGroupAddon>
@@ -47,7 +47,6 @@ export default function SearchBar({
         <InputGroupAddon align="inline-end">
           <InputGroupButton type="submit" aria-label="Search">
             <Search data-icon="inline-start" />
-            <span>Search</span>
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>

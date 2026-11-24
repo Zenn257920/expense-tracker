@@ -152,40 +152,59 @@ export default function DashboardPage() {
             <p className="break-words text-2xl font-semibold tracking-tight tabular-nums">
               {signedMoney(summary.balance, "")}
             </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              This month: Income{" "}
-              <span className="font-medium text-green-600 dark:text-green-400">
-                {signedMoney(summary.thisMonthIncome)}
-              </span>{" "}
-              · Expenses{" "}
-              <span className="font-medium text-red-600 dark:text-red-400">
-                {signedMoney(summary.thisMonthExpenses, "−")}
-              </span>{" "}
-              · Net{" "}
-              <span
-                className={`font-medium ${
-                  thisMonthNet < 0
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-green-600 dark:text-green-400"
-                }`}
-              >
-                {signedMoney(thisMonthNet)}
-              </span>
-            </p>
+            <div className="mt-4 border-t pt-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                This month
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">
+                    Income
+                  </p>
+                  <p className="mt-0.5 break-words text-sm font-semibold text-green-600 tabular-nums dark:text-green-400">
+                    {signedMoney(summary.thisMonthIncome)}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">
+                    Expenses
+                  </p>
+                  <p className="mt-0.5 break-words text-sm font-semibold text-red-600 tabular-nums dark:text-red-400">
+                    {signedMoney(summary.thisMonthExpenses, "−")}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">Net</p>
+                  <p
+                    className={`mt-0.5 break-words text-sm font-semibold tabular-nums ${
+                      thisMonthNet < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}
+                  >
+                    {signedMoney(thisMonthNet)}
+                  </p>
+                </div>
+              </div>
+            </div>
             {(borrowedRemaining !== undefined ||
               lentRemaining !== undefined) && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Outstanding ·{" "}
-                {borrowedRemaining !== undefined && (
-                  <>Borrowed {formatMoney(borrowedRemaining)}</>
-                )}
-                {borrowedRemaining !== undefined &&
-                  lentRemaining !== undefined &&
-                  " · "}
-                {lentRemaining !== undefined && (
-                  <>Lent {formatMoney(lentRemaining)}</>
-                )}
-              </p>
+              <div className="mt-3 border-t pt-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Outstanding
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {borrowedRemaining !== undefined && (
+                    <>Borrowed {formatMoney(borrowedRemaining)}</>
+                  )}
+                  {borrowedRemaining !== undefined &&
+                    lentRemaining !== undefined &&
+                    " · "}
+                  {lentRemaining !== undefined && (
+                    <>Lent {formatMoney(lentRemaining)}</>
+                  )}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
