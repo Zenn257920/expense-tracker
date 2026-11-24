@@ -38,8 +38,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useCategories } from "@/hooks/use-categories";
-import AddTransactionDialog from "@/components/transactions/add-transaction-dialog";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 
@@ -184,13 +182,6 @@ export default function AppSidebar() {
 
 export function DashboardHeader() {
   const pathname = usePathname();
-  const router = useRouter();
-  const {
-    categories,
-    isLoading,
-    error,
-    refreshCategories,
-  } = useCategories();
   const title =
     pathname === "/transactions/new"
       ? "Add transaction"
@@ -205,15 +196,6 @@ export function DashboardHeader() {
         <SidebarTrigger className="size-10" />
         <div className="h-5 w-px bg-border" />
         <h1 className="text-sm font-medium text-foreground">{title}</h1>
-      </div>
-      <div className="hidden sm:block">
-        <AddTransactionDialog
-          categories={categories}
-          isLoadingCategories={isLoading}
-          categoriesError={error}
-          onTransactionAdded={() => router.refresh()}
-          onCategoriesChanged={refreshCategories}
-        />
       </div>
     </header>
   );
