@@ -46,7 +46,7 @@ export default function AddTransactionDialog({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger
         render={
-          <Button type="button">
+          <Button type="button" variant="outline">
             <Plus data-icon="inline-start" />
             Add transaction
           </Button>
