@@ -11,16 +11,9 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldTitle,
 } from "@/components/ui/field";
 import Input from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { formatTransactionDate } from "@/components/transactions/recent-transactions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
@@ -92,6 +85,12 @@ export default function AddTransactionForm({
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // Quick-add: "Type" is the default tab; "Voice" shows only the voice
+  // section. Switching tabs never clears fields or voice state.
+  const [inputMode, setInputMode] = useState<"type" | "voice">("type");
+  // Description + date live behind this disclosure — quick-add only needs
+  // type, amount and category.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [voiceResult, setVoiceResult] = useState<ParsedVoiceTransaction | null>(
     null,
   );
@@ -265,10 +264,6 @@ export default function AddTransactionForm({
     (category) => category.type === type,
   );
   const formError = error || categoriesError;
-  const categoryItems = filteredCategories.map((category) => ({
-    label: category.name,
-    value: category.id,
-  }));
 
   function handleTypeChange(newType: TransactionType) {
     dirtyRef.current.add("type");
@@ -320,6 +315,12 @@ export default function AddTransactionForm({
     }
     if (!transactionDate) nextErrors.date = "Date ရွေးပေးပါ";
     if (Object.keys(nextErrors).length > 0) {
+      // Amount/category/date all live in the Type tab — switch there so
+      // the inline error is actually visible when submitting from Voice.
+      setInputMode("type");
+      // The date field lives behind the "More details" disclosure — open
+      // it so a date error is actually visible.
+      if (nextErrors.date) setDetailsOpen(true);
       setFieldErrors(nextErrors);
       if (nextErrors.category) focusField("category");
       else if (nextErrors.amount) focusField("amount");
@@ -357,26 +358,39 @@ export default function AddTransactionForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <section
-        className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4"
-        aria-label="Voice transaction input"
-      >
-        <button
+      <div role="group" aria-label="Input method" className="flex gap-2">
+        <Button
           type="button"
-          onClick={() => setVoiceOpen((open) => !open)}
-          aria-expanded={voiceOpen}
-          className="flex min-h-11 items-center gap-2 text-left font-medium"
+          variant={inputMode === "type" ? "default" : "outline"}
+          aria-pressed={inputMode === "type"}
+          className="min-h-11 flex-1"
+          onClick={() => setInputMode("type")}
+        >
+          Type
+        </Button>
+        <Button
+          type="button"
+          variant={inputMode === "voice" ? "default" : "outline"}
+          aria-pressed={inputMode === "voice"}
+          className="min-h-11 flex-1"
+          onClick={() => {
+            // The tab replaces the old "Add by voice" disclosure, so
+            // entering the Voice tab opens the voice section.
+            setVoiceOpen(true);
+            setInputMode("voice");
+          }}
         >
           <Mic data-icon="inline-start" />
-          Add by voice
-          <ChevronDown
-            className={`size-4 transition-transform ${voiceOpen ? "rotate-180" : ""}`}
-          />
-        </button>
+          Voice
+        </Button>
+      </div>
 
-        {voiceOpen && (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+      {inputMode === "voice" && voiceOpen && (
+        <section
+          className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4"
+          aria-label="Voice transaction input"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm text-muted-foreground" aria-live="polite">
                   {isListening
@@ -585,7 +599,7 @@ export default function AddTransactionForm({
                           ? type === "income"
                             ? "Income"
                             : "Expense"
-                          : "Not sure — pick below"}
+                          : "Not sure — pick in the Type tab"}
                       </p>
                       <p>
                         <span className="text-muted-foreground">Category: </span>
@@ -626,7 +640,7 @@ export default function AddTransactionForm({
                             field === "amount"
                               ? "amount"
                               : field === "category"
-                                ? "a matching category (pick one below)"
+                                ? "a matching category (pick one in the Type tab)"
                                 : field === "type"
                                   ? "income or expense"
                                   : "a description",
@@ -657,21 +671,22 @@ export default function AddTransactionForm({
                       )}
                     {!voiceResult.categoryName && !categoryId && (
                       <FieldDescription>
-                        No category was heard in that phrase — use “+ New
-                        category” under Category below to make one (e.g. Outing).
+                        No category was heard in that phrase — switch to the
+                        Type tab and use “+ New category” under Category to
+                        make one (e.g. Outing).
                       </FieldDescription>
                     )}
                   </div>
                 )}
               </div>
             )}
-          </>
-        )}
-      </section>
+        </section>
+      )}
 
-      <FieldGroup className="grid gap-4 sm:grid-cols-2">
-        <Field className="sm:col-span-2">
-          <FieldLabel>Transaction type</FieldLabel>
+      {inputMode === "type" && (
+        <FieldGroup className="grid gap-4">
+          <Field>
+            <FieldLabel>Transaction type</FieldLabel>
           <div
             role="group"
             aria-label="Transaction type"
@@ -714,6 +729,7 @@ export default function AddTransactionForm({
             id="amount"
             type="text"
             inputMode="decimal"
+            className="h-14 text-2xl font-semibold tabular-nums"
             value={amount}
             onChange={(event) => handleAmountChange(event.target.value)}
             onFocus={handleAmountFocus}
@@ -724,37 +740,44 @@ export default function AddTransactionForm({
         </Field>
 
         <Field data-invalid={Boolean(fieldErrors.category)}>
-          <FieldLabel htmlFor="category">Category</FieldLabel>
-          <Select
-            items={categoryItems}
-            value={categoryId || null}
-            onValueChange={(value) => {
-              dirtyRef.current.add("category");
-              setCategoryId(value ?? "");
-              clearFieldError("category");
-            }}
-            disabled={isLoadingCategories}
+          <FieldTitle id="category-label">Category</FieldTitle>
+          <div
+            id="category"
+            role="group"
+            aria-labelledby="category-label"
+            className="flex min-h-11 flex-wrap items-center gap-2"
           >
-            <SelectTrigger id="category" className="w-full">
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {categoryItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+            {isLoadingCategories ? (
+              <p className="text-sm text-muted-foreground">
+                Loading categories…
+              </p>
+            ) : filteredCategories.length === 0 ? (
+              <FieldDescription>
+                No {type} categories found. Create a category first.
+              </FieldDescription>
+            ) : (
+              filteredCategories.map((category) => (
+                <Button
+                  key={category.id}
+                  type="button"
+                  variant={categoryId === category.id ? "default" : "outline"}
+                  aria-pressed={categoryId === category.id}
+                  onClick={() => {
+                    dirtyRef.current.add("category");
+                    setCategoryId(category.id);
+                    clearFieldError("category");
+                  }}
+                >
+                  {categoryId === category.id && (
+                    <Check data-icon="inline-start" />
+                  )}
+                  {category.name}
+                </Button>
+              ))
+            )}
+          </div>
           {fieldErrors.category && (
             <FieldError>{fieldErrors.category}</FieldError>
-          )}
-          {!isLoadingCategories && filteredCategories.length === 0 && (
-            <FieldDescription>
-              No {type} categories found. Create a category first.
-            </FieldDescription>
           )}
           {!showNewCategory ? (
             <Button
@@ -818,39 +841,61 @@ export default function AddTransactionForm({
           )}
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="description">Description</FieldLabel>
-          <Input
-            id="description"
-            value={description}
-            onChange={(event) => {
-              dirtyRef.current.add("description");
-              setDescription(event.target.value);
-            }}
-            placeholder="e.g. Lunch, Salary, Shopping"
-            maxLength={500}
-          />
-          <FieldDescription>
-            Optional — defaults to the category name.
-          </FieldDescription>
-        </Field>
+        <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((open) => !open)}
+            aria-expanded={detailsOpen}
+            className="flex min-h-11 items-center gap-2 text-left font-medium"
+          >
+            More details
+            <ChevronDown
+              className={`size-4 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {detailsOpen && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="description">Description</FieldLabel>
+                <Input
+                  id="description"
+                  value={description}
+                  onChange={(event) => {
+                    dirtyRef.current.add("description");
+                    setDescription(event.target.value);
+                  }}
+                  placeholder="e.g. Lunch, Salary, Shopping"
+                  maxLength={500}
+                />
+                <FieldDescription>
+                  Optional — defaults to the category name.
+                </FieldDescription>
+              </Field>
 
-        <Field data-invalid={Boolean(fieldErrors.date)}>
-          <FieldLabel htmlFor="transactionDate">Transaction date</FieldLabel>
-          <Input
-            id="transactionDate"
-            type="date"
-            value={transactionDate}
-            onChange={(event) => {
-              dirtyRef.current.add("date");
-              setTransactionDate(event.target.value);
-              clearFieldError("date");
-            }}
-            required
-          />
-          {fieldErrors.date && <FieldError>{fieldErrors.date}</FieldError>}
-        </Field>
-      </FieldGroup>
+              <Field data-invalid={Boolean(fieldErrors.date)}>
+                <FieldLabel htmlFor="transactionDate">
+                  Transaction date
+                </FieldLabel>
+                <Input
+                  id="transactionDate"
+                  type="date"
+                  value={transactionDate}
+                  onChange={(event) => {
+                    dirtyRef.current.add("date");
+                    setTransactionDate(event.target.value);
+                    clearFieldError("date");
+                  }}
+                  required
+                />
+                {fieldErrors.date && (
+                  <FieldError>{fieldErrors.date}</FieldError>
+                )}
+              </Field>
+            </div>
+          )}
+        </div>
+        </FieldGroup>
+      )}
 
       {formError && <FieldError>{formError}</FieldError>}
       <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col gap-2 border-t bg-popover px-4 pt-3 pb-4">

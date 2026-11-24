@@ -245,20 +245,7 @@ export default function TransactionsPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Browse, search, and manage your transactions.
-          </p>
-          <AddTransactionDialog
-            categories={categories}
-            isLoadingCategories={isLoadingCategories}
-            categoriesError={categoriesError}
-            onTransactionAdded={refreshTransactions}
-            onCategoriesChanged={refreshCategories}
-          />
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <Tabs
             value={typeFilter}
             onValueChange={(value) => {
@@ -278,33 +265,72 @@ export default function TransactionsPage() {
               <TabsTrigger value="income">Income</TabsTrigger>
             </TabsList>
           </Tabs>
-          <SearchBar
-            value={searchInput}
-            placeholder="Search description or category…"
-            hasSearch={Boolean(search)}
-            onChange={setSearchInput}
-            onSearch={(query) => {
-              setError(null);
-              setIsLoading(true);
-              setSearch(query);
-              setPage(1);
-            }}
-            onReset={() => {
-              setSearchInput("");
-              setError(null);
-              setIsLoading(true);
-              setSearch("");
-              setPage(1);
-            }}
+          <AddTransactionDialog
+            categories={categories}
+            isLoadingCategories={isLoadingCategories}
+            categoriesError={categoriesError}
+            onTransactionAdded={refreshTransactions}
+            onCategoriesChanged={refreshCategories}
           />
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div
-            className={`flex-col gap-3 sm:flex sm:flex-row sm:items-end ${
-              filtersOpen ? "flex" : "hidden"
-            }`}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <SearchBar
+              value={searchInput}
+              placeholder="Search description or category…"
+              hasSearch={Boolean(search)}
+              onChange={setSearchInput}
+              onSearch={(query) => {
+                setError(null);
+                setIsLoading(true);
+                setSearch(query);
+                setPage(1);
+              }}
+              onReset={() => {
+                setSearchInput("");
+                setError(null);
+                setIsLoading(true);
+                setSearch("");
+                setPage(1);
+              }}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
           >
+            <SlidersHorizontal data-icon="inline-start" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Export CSV"
+            title="Export CSV"
+            disabled={isExporting || totalTransactions === 0}
+            onClick={handleExportCsv}
+          >
+            {isExporting ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <Download data-icon="inline-start" />
+            )}
+          </Button>
+        </div>
+
+        <div
+          className={`flex-col gap-3 ${filtersOpen ? "flex" : "hidden"}`}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <Field className="sm:min-w-48">
               <FieldLabel htmlFor="filter-category">Category</FieldLabel>
               <Select
@@ -358,46 +384,13 @@ export default function TransactionsPage() {
             </Field>
           </div>
           {dateError && <FieldError>{dateError}</FieldError>}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="sm:hidden"
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <SlidersHorizontal data-icon="inline-start" />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-            {isFiltered && (
+          {isFiltered && (
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={clearAllFilters}>
                 Clear filters
               </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isExporting || totalTransactions === 0}
-              onClick={handleExportCsv}
-            >
-              {isExporting ? (
-                <>
-                  <Spinner data-icon="inline-start" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download data-icon="inline-start" />
-                  Export CSV
-                </>
-              )}
-            </Button>
-          </div>
+            </div>
+          )}
         </div>
 
         {error && (
