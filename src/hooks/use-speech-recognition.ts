@@ -73,6 +73,33 @@ function getSpeechRecognitionConstructor() {
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
 }
 
+// The native plugin rejects start() with the recognizer's own reason
+// ("Insufficient permissions", "Network error", "No speech input",
+// ...). Show that reason instead of a generic message, so a failure
+// on the phone says what actually went wrong.
+function getNativeErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  switch (message) {
+    case "Missing permission":
+    case "Insufficient permissions":
+      return "Microphone access was blocked. Allow microphone access and try again.";
+    case "Network error":
+    case "Network timeout":
+    case "error from server":
+      return "Speech recognition couldn't reach its service. Check your connection and try again, or type the transaction below instead.";
+    case "No speech input":
+    case "No match":
+    case "Didn't understand, please try again.":
+      return "No speech was recognized. Please try again.";
+    case "Audio recording error":
+      return "No microphone was found. Connect a microphone and try again.";
+    default:
+      return message
+        ? `Could not start the microphone. (${message})`
+        : "Could not start the microphone. Please try again.";
+  }
+}
+
 function getRecognitionErrorMessage(code: string) {
   switch (code) {
     case "not-allowed":
@@ -107,6 +134,9 @@ export function useSpeechRecognition(
   const [nativeAvailable, setNativeAvailable] = useState<boolean | null>(null);
   const nativeListeningRef = useRef(false);
   const nativeFinalizedRef = useRef(false);
+  // True while the system voice popup is the active attempt, so a stale
+  // "stopped" event from the failed inline attempt can't finalize early.
+  const popupFallbackRef = useRef(false);
   const support = useSyncExternalStore(
     subscribeToSpeechSupport,
     getSpeechSupportSnapshot,
@@ -166,6 +196,7 @@ export function useSpeechRecognition(
     setTranscript("");
     finalTranscriptRef.current = "";
     nativeFinalizedRef.current = false;
+    popupFallbackRef.current = false;
     try {
       const permission = await SpeechRecognition.requestPermissions();
       if (permission.speechRecognition !== "granted") {
@@ -187,29 +218,49 @@ export function useSpeechRecognition(
         setTranscript(text);
       });
       await SpeechRecognition.addListener("listeningState", ({ status }) => {
-        if (status === "stopped") {
+        if (status === "stopped" && !popupFallbackRef.current) {
           finalizeNative(finalTranscriptRef.current);
         }
       });
       nativeListeningRef.current = true;
       setIsListening(true);
-      const { matches } = await SpeechRecognition.start({
-        language,
-        maxResults: 1,
-        partialResults: true,
-        popup: false,
-      });
-      // With partialResults the promise resolves without a result; the
-      // final text arrives via the listeners. If the platform does
-      // return matches, use them.
-      if (matches?.[0]) {
-        finalizeNative(matches[0]);
+      try {
+        // Inline recognition: live transcript while speaking.
+        const { matches } = await SpeechRecognition.start({
+          language,
+          maxResults: 1,
+          partialResults: true,
+          popup: false,
+        });
+        // With partialResults the promise resolves without a result; the
+        // final text arrives via the listeners. If the platform does
+        // return matches, use them.
+        if (matches?.[0]) {
+          finalizeNative(matches[0]);
+        }
+      } catch (inlineError) {
+        // Inline recognition failed on this device — fall back once to
+        // the system's own voice popup, the most compatible path. Its
+        // result comes back as matches on the promise; partial-result
+        // listeners don't fire in popup mode, so drop them first.
+        popupFallbackRef.current = true;
+        await SpeechRecognition.removeAllListeners().catch(() => {});
+        const { matches } = await SpeechRecognition.start({
+          language,
+          maxResults: 1,
+          popup: true,
+        });
+        if (matches?.[0]) {
+          finalizeNative(matches[0]);
+        } else {
+          throw inlineError;
+        }
       }
-    } catch {
+    } catch (error) {
       nativeListeningRef.current = false;
       setIsListening(false);
       void SpeechRecognition.removeAllListeners().catch(() => {});
-      setError("Could not start the microphone. Please try again.");
+      setError(getNativeErrorMessage(error));
     }
   }, [language, finalizeNative]);
 
